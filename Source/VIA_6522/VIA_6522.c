@@ -1,4 +1,8 @@
-
+//------------------------------------------------------------------------------------------------
+//----                                                                                        ----
+//------------------------------------------------------------------------------------------------
+//----                                                                                        ----
+//------------------------------------------------------------------------------------------------
 #include <stdio.h>
 #include "types.h"
 #include "pico/stdlib.h"
@@ -43,6 +47,70 @@ enum rgbColours {RGB_BLACK, RGB_RED, RGB_GREEN, RGB_YELLOW, RGB_BLUE, RGB_MAGENT
 
 u8 aVGAScreenBuffer[(VGA_RESOLUTION_X * VGA_RESOLUTION_Y) >> 1];
 u8* address_pointer = aVGAScreenBuffer;
+
+//------------------------------------------------------------------------------------------------
+//----                                                                                        ----
+//------------------------------------------------------------------------------------------------
+typedef struct
+{
+	union
+	{
+		u8 m_aReg[16];
+		struct
+		{
+			u8 m_u8PortB;					/* 0 */
+			u8 m_u8PortA;					/* 1 */
+			u8 m_uDataDirB;					/* 2 */
+			u8 m_uDataDirA;					/* 3 */
+			u8 m_uTimer1_L;					/* 4 */
+			u8 m_uTimer1_H;					/* 5 */
+			u8 m_uTimer1_Load_L;			/* 6 */
+			u8 m_uTimer1_Load_H;			/* 7 */
+			u8 m_uTimer2_L;					/* 8 */
+			u8 m_uTimer2_H;					/* 9 */
+			u8 m_uShiftReg;					/* A */
+			u8 m_uAuxiliaryCtrl;			/* B */
+			u8 m_uPeripheralCtrl;			/* C */
+			u8 m_uInterruptFlags;			/* D */
+			u8 m_uInterruptEnable;			/* E */
+			u8 m_u8PortA_NoHandshake;		/* F */
+		};
+	};
+} ViaRegisters;
+
+static const char s_aszRegisterNames[16][16] =
+{
+/*  "123456789ABCDEF"	*/
+	"Port B",
+	"Port A",
+	"Dir B",
+	"Dir A",
+	"Timer 1 L",
+	"Timer 1 H",
+	"T1 Load L",
+	"T1 Load H",
+	"Timer 2 L",
+	"Timer 2 H",
+	"Shift Reg",
+	"Aux Ctrl",
+	"Periph Ctrl",
+	"Int Flags",
+	"Int Enable",
+	"PA No HShake"
+/*  "123456789ABCDEF"	*/
+};
+
+static volatile ViaRegisters s_aViaRegs[2];
+
+typedef struct
+{
+	u8	m_uOffset;
+	u8	m_uData;
+} RegisterBuffer;
+
+static volatile RegisterBuffer s_aRegBuffer[16];
+static volatile u8 s_uRegHead = 15;
+static volatile u8 s_uRegTail = 15;
 
 //------------------------------------------------------------------------------------------------
 //----                                                                                        ----
@@ -270,36 +338,6 @@ void FormatHexDumpLine(uint32_t uCharX, uint32_t uCharY, const uint32_t uAddress
 //----                                                                                        ----
 //------------------------------------------------------------------------------------------------
 #define __scratch_x_func(func_name)   __scratch_x(__STRING(func_name)) func_name
-
-typedef struct
-{
-	union
-	{
-		u8 m_aReg[16];
-		struct
-		{
-			u8 m_u8PortB;
-			u8 m_u8PortA;
-			u8 m_uDataDirB;
-			u8 m_uDataDirA;
-			u8 m_uTimer1_L;
-			u8 m_uTimer1_H;
-			u8 m_uTimer1_Load_L;
-			u8 m_uTimer1_Load_H;
-			u8 m_uTimer2_L;
-			u8 m_uTimer2_H;
-			u8 m_uShiftReg;
-			u8 m_uAuxiliaryCtrl;
-			u8 m_uPeripheralCtrl;
-			u8 m_uInterruptFlags;
-			u8 m_uInterruptEnable;
-			u8 m_u8PortA_NoHandshake;
-		};
-	};
-} ViaRegisters;
-
-static volatile ViaRegisters s_aViaRegs[2];
-
 static void __scratch_x_func(function_core1)(void)
 {
 	save_and_disable_interrupts();
@@ -311,18 +349,31 @@ static void __scratch_x_func(function_core1)(void)
 		while (1 == (((uLow32Pins >> PIN_IO0) | (~uLow32Pins >> PIN_S02)) & 1))
 	 		uLow32Pins = gpioc_lo_in_get();
 
- 		uLow32Pins = gpioc_lo_in_get();
+		delay_120ns();
+//		delay_120ns();
+		uLow32Pins = gpioc_lo_in_get();
 
 		if (0 == ((uLow32Pins >> PIN_READ_WRITE) & 1))
 		{
-			delay_120ns();
 			const u32 uHi32Pins = gpioc_hi_in_get();
-			
+			const u8 uRegTail = (s_uRegTail + 1) & 15;
+
+			// Ring Buffer Full !!!
+		    assert(uRegTail != s_uRegHead);
+
 			if ((uLow32Pins >> PIN_ADDRESS_BIT4) & 1)
-				s_aViaRegs[0].m_aReg[uLow32Pins & 0xF] = (u8)uHi32Pins;
+			{
+				s_aRegBuffer[uRegTail].m_uOffset = uLow32Pins & 0xF;
+				s_aRegBuffer[uRegTail].m_uData = (u8)uHi32Pins;
+				s_uRegTail = uRegTail;
+			}
 
 			if ((uLow32Pins >> PIN_ADDRESS_BIT5) & 1)
-				s_aViaRegs[1].m_aReg[uLow32Pins & 0xF] = (u8)uHi32Pins;
+			{
+				s_aRegBuffer[uRegTail].m_uOffset = (uLow32Pins & 0xF) + 16;
+				s_aRegBuffer[uRegTail].m_uData = (u8)uHi32Pins;
+				s_uRegTail = uRegTail;
+			}
 		}
 
 		// Wait for IO0 To Return Hi OR S02 To Assert Low
@@ -356,40 +407,54 @@ int main()
 		gpio_set_dir(uPin, GPIO_IN);
 	}
 
-	multicore_launch_core1(function_core1);
-
 	initVGA();
 	FilledRectangle(0, 0, VGA_RESOLUTION_X, VGA_RESOLUTION_Y, RGB_GREEN);
 	FilledRectangle(1, 1, VGA_RESOLUTION_X-2, VGA_RESOLUTION_Y-2, RGB_BLACK);
 
+	// Draw All The Constant Text To The Screen
 	char szTempString[128];
+	DrawString(20, 18, "VIA 1", RGB_CYAN);
+	DrawString(50, 18, "VIA 2", RGB_CYAN);
 
 	for (u32 uRegisterIndex=0; uRegisterIndex<16; ++uRegisterIndex)
 	{ 
 		sprintf(szTempString, "0x%04X", 0x9110 + uRegisterIndex);
-		DrawString(3, 20 + uRegisterIndex, szTempString, RGB_BLUE);
+		DrawString(13, 20 + uRegisterIndex, szTempString, RGB_BLUE);
+		DrawString(20, 20 + uRegisterIndex, "0x", RGB_YELLOW);
+		DrawString(25, 20 + uRegisterIndex, s_aszRegisterNames[uRegisterIndex], RGB_CYAN);
+
 		sprintf(szTempString, "0x%04X", 0x9120 + uRegisterIndex);
-		DrawString(23, 20 + uRegisterIndex, szTempString, RGB_BLUE);
+		DrawString(43, 20 + uRegisterIndex, szTempString, RGB_BLUE);
+		DrawString(50, 20 + uRegisterIndex, "0x", RGB_YELLOW);
+		DrawString(55, 20 + uRegisterIndex, s_aszRegisterNames[uRegisterIndex], RGB_CYAN);
 	}
+
+	multicore_launch_core1(function_core1);
 
 	while(true)
 	{
-		u32 uTextXPos = 10;
+		u32 uTextXPos = 22;
 
+		// Loop For Both VIA's
 		for (u32 uViaIndex=0; uViaIndex<2; ++uViaIndex)
 		{
+			// Loop For All 16 Registers
 			for (u32 uRegisterIndex=0; uRegisterIndex<16; ++uRegisterIndex)
 			{ 
-				const u8 uValue = s_aViaRegs[uViaIndex].m_aReg[uRegisterIndex];
-				sprintf(szTempString, "0x%02X", uValue);
+				// Write The Register Values To The Appropriate Screen Position
+				const uint16_t uHexPair = byteToHex(s_aViaRegs[uViaIndex].m_aReg[uRegisterIndex]);
+				DrawPetsciiChar((uTextXPos    ) << 3, (20 + uRegisterIndex) << 3, uHexPair >> 8, RGB_YELLOW);
+				DrawPetsciiChar((uTextXPos + 1) << 3, (20 + uRegisterIndex) << 3, uHexPair & 255, RGB_YELLOW);
 
-				if ((1 == uViaIndex) && (0 == uRegisterIndex) && (0xF7 != uValue))
-					DrawString(uTextXPos + 10, 20 + uRegisterIndex, szTempString, RGB_CYAN);
-
-				DrawString(uTextXPos, 20 + uRegisterIndex, szTempString, RGB_YELLOW);
+				// Are There Any Register Writes On The Ring Buffer?
+				if (s_uRegHead != s_uRegTail)
+				{
+					s_aViaRegs->m_aReg[s_aRegBuffer[s_uRegHead].m_uOffset] = s_aRegBuffer[s_uRegHead].m_uData;
+					s_uRegHead = (s_uRegHead + 1) & 15;
+				}
 			}
 
-			uTextXPos += 20;
+			uTextXPos += 30;
 		}
 	}
 }
