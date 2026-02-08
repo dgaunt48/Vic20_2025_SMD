@@ -74,12 +74,33 @@ typedef struct
 			u8 m_u8PortA;					/* 1 */
 			u8 m_uDataDirB;					/* 2 */
 			u8 m_uDataDirA;					/* 3 */
-			u8 m_uTimer1_L;					/* 4 */
-			u8 m_uTimer1_H;					/* 5 */
-			u8 m_uTimer1_Latch_L;			/* 6 */
-			u8 m_uTimer1_Latch_H;			/* 7 */
-			u8 m_uTimer2_L;					/* 8 */
-			u8 m_uTimer2_H;					/* 9 */
+			union
+			{
+				u16	m_uTimer1;
+				struct
+				{
+					u8 m_uTimer1_L;			/* 4 */
+					u8 m_uTimer1_H;			/* 5 */
+				};
+			};
+			union
+			{
+				u16	m_uTimer1_Latch;
+				struct
+				{
+					u8 m_uTimer1_Latch_L;	/* 6 */
+					u8 m_uTimer1_Latch_H;	/* 7 */
+				};
+			};
+			union
+			{
+				u16	m_uTimer2;
+				struct
+				{
+					u8 m_uTimer2_L;			/* 8 */
+					u8 m_uTimer2_H;			/* 9 */
+				};
+			};
 			u8 m_uShiftReg;					/* A */
 			u8 m_uAuxiliaryCtrl;			/* B */
 			u8 m_uPeripheralCtrl;			/* C */
@@ -89,6 +110,7 @@ typedef struct
 		};
 	};
 } ViaRegisters;
+static_assert(sizeof(ViaRegisters) == 16);
 
 static const char s_aszRegisterNames[16][16] =
 {
@@ -353,26 +375,63 @@ void FormatHexDumpLine(uint32_t uCharX, uint32_t uCharY, const uint32_t uAddress
 static void __scratch_x_func(function_core1)(void)
 {
 	save_and_disable_interrupts();
- 	u32 uLow32Pins = 0;
+ 	u32 uLow32Pins = gpioc_lo_in_get();
+	u32 uS02 = (uLow32Pins >> PIN_S02) & 1;
 
 	while(true)
  	{
-		// Wait for IO0 To Assert Low AND S02 To Assert HI
-		while (1 == (((uLow32Pins >> PIN_IO0) | (~uLow32Pins >> PIN_S02)) & 1))
+		while(true)
+		{
 	 		uLow32Pins = gpioc_lo_in_get();
 
+			// If S02 Is Hi
+			if ((uLow32Pins >> PIN_S02) & 1)
+			{
+				// And IO0 Is Low Then Process VIA IO
+				if (0 == ((uLow32Pins >> PIN_IO0) & 1))
+					break;
+
+				if (0 == uS02)
+				{
+					// S02 Has Transitioned From Low To Hi - Check If The Timer Is Non-Zero
+					if (0 != s_aViaRegs[1].m_uTimer1)
+					{
+						// If the Timer Will Go To Zero
+						if (1 == s_aViaRegs[1].m_uTimer1)
+						{
+							s_aViaRegs[1].m_uTimer1 = s_aViaRegs[1].m_uTimer1_Latch;
+							s_aViaRegs[1].m_uInterruptFlags |= (1 << VIA_IRQ_TIMER1);
+						}
+						else
+						{
+							s_aViaRegs[1].m_uTimer1--;
+						}
+					}
+
+					// We Have Finished For This Transition Of S02
+					uS02 = 1;
+				}
+			}
+			else
+			{
+				// S02 Has Transitioned From Hi To Low
+				uS02 = 0;
+			}
+		}
+
 		delay_120ns();
-//		delay_120ns();
 		uLow32Pins = gpioc_lo_in_get();
 
 		if (0 == ((uLow32Pins >> PIN_READ_WRITE) & 1))
 		{
+			// CPU Is In Write Mode So Copy Bus To Internal Registers
 			const u32 uHi32Pins = gpioc_hi_in_get();
 			const u8 uRegTail = (s_uRegTail + 1) & 15;
 
 			// Ring Buffer Full !!!
 		    assert(uRegTail != s_uRegHead);
 
+			// Address Bit 4 Selects VIA 1
 			if ((uLow32Pins >> PIN_ADDRESS_BIT4) & 1)
 			{
 				s_aRegBuffer[uRegTail].m_uOffset = uLow32Pins & 0xF;
@@ -380,6 +439,7 @@ static void __scratch_x_func(function_core1)(void)
 				s_uRegTail = uRegTail;
 			}
 
+			// Address Bit 5 Selects VIA 2	(KeyBoard, Cursor Blink Timer)
 			if ((uLow32Pins >> PIN_ADDRESS_BIT5) & 1)
 			{
 				s_aRegBuffer[uRegTail].m_uOffset = (uLow32Pins & 0xF) + 16;
@@ -389,6 +449,7 @@ static void __scratch_x_func(function_core1)(void)
 		}
 		else
 		{
+			// CPU Is In Read Mode - So Present Data On Bus
 			if ((uLow32Pins >> PIN_ADDRESS_BIT4) & 1)
 			{
 				const u8 uData = s_aViaRegs[0].m_aReg[uLow32Pins & 0xF];
@@ -417,9 +478,104 @@ static void __scratch_x_func(function_core1)(void)
 		while (0 == (((uLow32Pins >> PIN_IO0) | (~uLow32Pins >> PIN_S02)) & 1))
 			uLow32Pins = gpioc_lo_in_get();
 
+		// Get Off The Bus
 		for(u32 uPin=32; uPin<=40; ++uPin)
 			gpio_set_dir(uPin, GPIO_IN);
 	}
+}
+
+//------------------------------------------------------------------------------------------------
+//----                                                                                        ----
+//------------------------------------------------------------------------------------------------
+static u32 s_uFakeTimer = 0;
+
+void ProcessVIA(void)
+{
+	// Are There Any Register Writes On The Ring Buffer?
+	if (s_uRegHead != s_uRegTail)
+	{
+		const u32 uViaIndex = (s_aRegBuffer[s_uRegHead].m_uOffset >> 4) & 1;
+		const u8 uRegister = s_aRegBuffer[s_uRegHead].m_uOffset & 15;
+		const u8 uData = s_aRegBuffer[s_uRegHead].m_uData;
+
+		switch(uRegister)
+		{
+			
+			case 4:		// Timer 1 Low Order Counter
+			{
+				// Write Data Into The Low Order Latch... Not The Counter!!!
+				s_aViaRegs[uViaIndex].m_uTimer1_Latch_L = uData;
+			}
+			break;
+
+			case 5:		// Timer 1 High Order Counter
+			{
+				s_aViaRegs[uViaIndex].m_uTimer1_Latch_H = uData;
+				s_aViaRegs[uViaIndex].m_uTimer1 = s_aViaRegs[uViaIndex].m_uTimer1_Latch;
+				s_aViaRegs[uViaIndex].m_uInterruptFlags &= ~(1 << VIA_IRQ_TIMER1);
+			}
+			break;
+
+			case 6:		// Timer 1 Low Order Latch
+			{
+				s_aViaRegs[uViaIndex].m_uTimer1_Latch_L = uData;
+			}
+			break;
+
+			case 7:		// Timer 1 High Order Latch
+			{
+				s_aViaRegs[uViaIndex].m_uTimer1_Latch_H = uData;
+				s_aViaRegs[uViaIndex].m_uInterruptFlags &= ~(1 << VIA_IRQ_TIMER1);
+			}
+			break;
+
+			case 13:
+			{
+				if (uData & 0x80)
+				{
+					// Bit 7 Is High So Enable Any Specified Interrupts.
+					s_aViaRegs[uViaIndex].m_uInterruptFlags |= (uData & 0x7F);
+				}
+				else
+				{
+					// Bit 7 Is Low So Disable Any Specified Interrupts.
+					s_aViaRegs[uViaIndex].m_uInterruptFlags &= (~uData & 0x7F);
+				}
+
+				if (s_aViaRegs[uViaIndex].m_uInterruptFlags)
+					s_aViaRegs[uViaIndex].m_uInterruptFlags |= (1 << VIA_IRQ_SET_CLR);
+			}
+			break;
+
+			case 14:	// Interrupt Enable Flags
+			{
+				if (uData & 0x80)
+				{
+					// Bit 7 Is High So Enable Any Specified Interrupts.
+					s_aViaRegs[uViaIndex].m_uInterruptEnable |= (uData & 0x7F);
+				}
+				else
+				{
+					// Bit 7 Is Low So Disable Any Specified Interrupts.
+					s_aViaRegs[uViaIndex].m_uInterruptEnable &= (~uData & 0x7F);
+				}
+			}
+			break;
+
+			default:
+			s_aViaRegs[uViaIndex].m_aReg[uRegister] = uData;
+		}
+
+		s_uRegHead = (s_uRegHead + 1) & 15;
+	}
+
+	const u8 uInterrupFlags = s_aViaRegs[1].m_uInterruptFlags & s_aViaRegs[1].m_uInterruptEnable;
+
+	// If Any Enabled Interrupt Is Flagged The Set The Hi Bit
+	s_aViaRegs[1].m_uInterruptFlags = (uInterrupFlags) ? (1 << VIA_IRQ_SET_CLR) | uInterrupFlags : 0;
+
+	// Reflect The IRQ Bit On The IO Pin.
+	gpio_put(PIN_IRQ, ((~s_aViaRegs[1].m_uInterruptFlags >> VIA_IRQ_SET_CLR) & 1));
 }
 
 //------------------------------------------------------------------------------------------------
@@ -464,6 +620,8 @@ int main()
 		gpio_set_dir(uPin, GPIO_IN);
 	}
 
+	multicore_launch_core1(function_core1);
+
 	initVGA();
 	FilledRectangle(0, 0, VGA_RESOLUTION_X, VGA_RESOLUTION_Y, RGB_GREEN);
 	FilledRectangle(1, 1, VGA_RESOLUTION_X-2, VGA_RESOLUTION_Y-2, RGB_BLACK);
@@ -486,9 +644,14 @@ int main()
 		DrawString(55, 20 + uRegisterIndex, s_aszRegisterNames[uRegisterIndex], RGB_CYAN);
 	}
 
-	multicore_launch_core1(function_core1);
 
-	u32 uFudge = 0;
+
+	// TODO - REMOVE - HACK TO RUN WITHOUT RESET !!!!
+	// s_aViaRegs[1].m_uTimer1 = 0x4826;
+	// s_aViaRegs[1].m_uTimer1_Latch = 0x4826;
+	// s_aViaRegs[1].m_uInterruptEnable = 0x40;
+	// TODO - REMOVE - HACK TO RUN WITHOUT RESET !!!!
+
 
 	while(true)
 	{
@@ -505,98 +668,8 @@ int main()
 				DrawPetsciiChar((uTextXPos    ) << 3, (20 + uRegisterIndex) << 3, uHexPair >> 8, RGB_YELLOW);
 				DrawPetsciiChar((uTextXPos + 1) << 3, (20 + uRegisterIndex) << 3, uHexPair & 255, RGB_YELLOW);
 
-				// Are There Any Register Writes On The Ring Buffer?
-				if (s_uRegHead != s_uRegTail)
-				{
-					const u32 uViaIndex = (s_aRegBuffer[s_uRegHead].m_uOffset >> 4) & 1;
-					const u8 uRegister = s_aRegBuffer[s_uRegHead].m_uOffset & 15;
-					const u8 uData = s_aRegBuffer[s_uRegHead].m_uData;
-
-					switch(uRegister)
-					{
-						
-						case 4:		// Timer 1 Low Order Counter
-						{
-							// Write Data Into The Low Order Latch... Not The Counter!!!
-							s_aViaRegs[uViaIndex].m_uTimer1_Latch_L = uData;
-						}
-						break;
-
-						case 5:		// Timer 1 High Order Counter
-						{
-							s_aViaRegs[uViaIndex].m_uTimer1_Latch_H = uData;
-							s_aViaRegs[uViaIndex].m_uTimer1_H = uData;
-							s_aViaRegs[uViaIndex].m_uTimer1_L = s_aViaRegs[uViaIndex].m_uTimer1_Latch_L;
-							s_aViaRegs[uViaIndex].m_uInterruptFlags &= ~(1 << VIA_IRQ_TIMER1);
-						}
-						break;
-
-						case 6:		// Timer 1 Low Order Latch
-						{
-							s_aViaRegs[uViaIndex].m_uTimer1_Latch_L = uData;
-						}
-						break;
-
-						case 7:		// Timer 1 High Order Latch
-						{
-							s_aViaRegs[uViaIndex].m_uTimer1_Latch_H = uData;
-							s_aViaRegs[uViaIndex].m_uInterruptFlags &= ~(1 << VIA_IRQ_TIMER1);
-						}
-						break;
-
-						case 13:
-						{
-							if (uData & 0x80)
-							{
-								// Bit 7 Is High So Enable Any Specified Interrupts.
-								s_aViaRegs[uViaIndex].m_uInterruptFlags |= (uData & 0x7F);
-							}
-							else
-							{
-								// Bit 7 Is Low So Disable Any Specified Interrupts.
-								s_aViaRegs[uViaIndex].m_uInterruptFlags &= (~uData & 0x7F);
-							}
-
-							if (s_aViaRegs[uViaIndex].m_uInterruptFlags)
-								s_aViaRegs[uViaIndex].m_uInterruptFlags |= (1 << VIA_IRQ_SET_CLR);
-						}
-						break;
-
-						case 14:	// Interrupt Enable Flags
-						{
-							if (uData & 0x80)
-							{
-								// Bit 7 Is High So Enable Any Specified Interrupts.
-								s_aViaRegs[uViaIndex].m_uInterruptEnable |= (uData & 0x7F);
-							}
-							else
-							{
-								// Bit 7 Is Low So Disable Any Specified Interrupts.
-								s_aViaRegs[uViaIndex].m_uInterruptEnable &= (~uData & 0x7F);
-							}
-						}
-						break;
-
-						default:
-						s_aViaRegs[uViaIndex].m_aReg[uRegister] = uData;
-					}
-
-					s_uRegHead = (s_uRegHead + 1) & 15;
-				}
-
-				if (++uFudge > 10000)
-				{
-					s_aViaRegs[1].m_uInterruptFlags |= (1 << VIA_IRQ_TIMER1);
-					uFudge = 0;
-				}
-
-				const u8 uInterrupFlags = s_aViaRegs[1].m_uInterruptFlags & s_aViaRegs[1].m_uInterruptEnable;
-
-				// If Any Enabled Interrupt Is Flagged The Set The Hi Bit
-				s_aViaRegs[1].m_uInterruptFlags = (uInterrupFlags) ? (1 << VIA_IRQ_SET_CLR) | uInterrupFlags : 0;
-
-				// Reflect The IRQ Bit On The IO Pin.
-				gpio_put(PIN_IRQ, ((~s_aViaRegs[1].m_uInterruptFlags >> VIA_IRQ_SET_CLR) & 1));
+				// Call This Often Or The Input Buffer Will Overflow!!!
+				ProcessVIA();
 			}
 
 			uTextXPos += 30;
