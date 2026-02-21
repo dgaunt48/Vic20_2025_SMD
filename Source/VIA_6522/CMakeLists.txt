@@ -35,7 +35,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(VIA_6522 VIA_6522.c VicChars.c)
+add_executable(VIA_6522 VIA_6522.c MCP23S17_GPIOExpander.c VicChars.c)
 
 pico_set_program_name(VIA_6522 "VIA_6522")
 pico_set_program_version(VIA_6522 "0.1")

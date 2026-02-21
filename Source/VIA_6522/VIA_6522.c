@@ -16,7 +16,10 @@
 #include "vsync.pio.h"
 #include "rgb.pio.h"
 
+#include "MCP23S17_GPIOExpander.h"
 #include "VicChars.h"
+
+#define MCP23S17_SPI_VIA_1		(0)         /* SPI IC ADDRESS */
 
 #define VGA_RESOLUTION_X    	(640)
 #define VGA_RESOLUTION_Y  		(480)
@@ -34,6 +37,10 @@ enum vga_pins {
 	PIN_RESET,
 	PIN_IRQ,
 	PIN_NMI,
+	PIN_SPI0_CS = 17,
+	PIN_SPI0_SCK,
+	PIN_SPI0_TX,
+	PIN_SPI0_RX,
 	PIN_IO0 = 22,
 	PIN_S02 = 26,
 	PIN_VSYNC,
@@ -350,27 +357,7 @@ static inline uint16_t byteToHex(const uint8_t uByte)
 //------------------------------------------------------------------------------------------------
 //----                                                                                        ----
 //------------------------------------------------------------------------------------------------
-void FormatHexDumpLine(uint32_t uCharX, uint32_t uCharY, const uint32_t uAddress, const uint8_t* pLineBuffer, const uint8_t uColour)
-{
-	// Write Address Offset in 6 byte hex.
-	for(int i=5; i>=0; --i)
-		DrawPetsciiChar((uCharX + 5 - i) << 3, uCharY << 3, aHexTable[(uAddress >> (i << 2)) & 15], uColour);
-
-	// Write 16 bytes worth of hex values.
- 	for(uint32_t uIndex=0; uIndex<16; ++uIndex)
-	{
-	    const uint16_t uHexPair = byteToHex(pLineBuffer[uIndex]);
-		DrawPetsciiChar((uCharX + 8 + (uIndex * 3)) << 3, uCharY << 3, uHexPair >> 8, uColour);
-		DrawPetsciiChar((uCharX + 9 + (uIndex * 3)) << 3, uCharY << 3, uHexPair & 255, uColour);
-
-		// Write ASCII version of byte.
-		DrawPetsciiChar((uCharX + 57 + uIndex) << 3, uCharY << 3, pLineBuffer[uIndex], uColour);
-	}
-}
-
-//------------------------------------------------------------------------------------------------
-//----                                                                                        ----
-//------------------------------------------------------------------------------------------------
+/*
 #define __scratch_x_func(func_name)   __scratch_x(__STRING(func_name)) func_name
 static void __scratch_x_func(function_core1)(void)
 {
@@ -487,8 +474,6 @@ static void __scratch_x_func(function_core1)(void)
 //------------------------------------------------------------------------------------------------
 //----                                                                                        ----
 //------------------------------------------------------------------------------------------------
-static u32 s_uFakeTimer = 0;
-
 void ProcessVIA(void)
 {
 	// Are There Any Register Writes On The Ring Buffer?
@@ -500,6 +485,37 @@ void ProcessVIA(void)
 
 		switch(uRegister)
 		{
+			case 0:		// Port B
+			{
+				if (uViaIndex)
+					MCP23S17_WriteRegisterSingle(MCP23S17_SPI_VIA_1, MCP23S17_OLATB, uData);
+			}
+			break;
+
+			case 1:		// Port A
+			{
+				if (uViaIndex)
+					MCP23S17_WriteRegisterSingle(MCP23S17_SPI_VIA_1, MCP23S17_OLATA, uData);
+			}
+			break;
+	
+			case 2:		// Direction B
+			{
+				s_aViaRegs[uViaIndex].m_uDataDirB = uData;
+
+				if (uViaIndex)
+					MCP23S17_WriteRegisterSingle(MCP23S17_SPI_VIA_1, MCP23S17_IODIRB, (~uData));
+			}
+			break;
+
+			case 3:		// Direction A
+			{
+				s_aViaRegs[uViaIndex].m_uDataDirA = uData;
+
+				if (uViaIndex)
+					MCP23S17_WriteRegisterSingle(MCP23S17_SPI_VIA_1, MCP23S17_IODIRA, (~uData));
+			}
+			break;
 			
 			case 4:		// Timer 1 Low Order Counter
 			{
@@ -576,8 +592,13 @@ void ProcessVIA(void)
 
 	// Reflect The IRQ Bit On The IO Pin.
 	gpio_put(PIN_IRQ, ((~s_aViaRegs[1].m_uInterruptFlags >> VIA_IRQ_SET_CLR) & 1));
-}
 
+	s_aViaRegs[1].m_u8PortB = MCP23S17_ReadRegisterSingle(MCP23S17_SPI_VIA_1, MCP23S17_GPIOB);
+	const u8 uGPIOA = MCP23S17_ReadRegisterSingle(MCP23S17_SPI_VIA_1, MCP23S17_GPIOA);
+	s_aViaRegs[1].m_u8PortA = uGPIOA;
+	s_aViaRegs[1].m_u8PortA_NoHandshake = uGPIOA;
+}
+*/
 //------------------------------------------------------------------------------------------------
 //----                                                                                        ----
 //------------------------------------------------------------------------------------------------
@@ -600,13 +621,13 @@ int main()
 
 	// IRQ Active Low
 	gpio_init(PIN_IRQ);
-	gpio_set_dir(PIN_IRQ, GPIO_OUT);
-	gpio_put(PIN_IRQ, true);
+	gpio_set_dir(PIN_IRQ, GPIO_IN);
+//	gpio_put(PIN_IRQ, true);
 
 	// NMI Active Low
 	gpio_init(PIN_NMI);
-	gpio_set_dir(PIN_NMI, GPIO_OUT);
-	gpio_put(PIN_NMI, true);
+	gpio_set_dir(PIN_NMI, GPIO_IN);
+//	gpio_put(PIN_NMI, true);
 
 	gpio_init(PIN_IO0);
 	gpio_set_dir(PIN_IO0, GPIO_IN);
@@ -620,11 +641,16 @@ int main()
 		gpio_set_dir(uPin, GPIO_IN);
 	}
 
-	multicore_launch_core1(function_core1);
+//	MCP23S17_Initialise(spi0, 5000000, PIN_SPI0_SCK, PIN_SPI0_TX, PIN_SPI0_RX, PIN_SPI0_CS);
+
+//	multicore_launch_core1(function_core1);
 
 	initVGA();
 	FilledRectangle(0, 0, VGA_RESOLUTION_X, VGA_RESOLUTION_Y, RGB_GREEN);
 	FilledRectangle(1, 1, VGA_RESOLUTION_X-2, VGA_RESOLUTION_Y-2, RGB_BLACK);
+
+//	MCP23S17_WriteRegisterPair(MCP23S17_SPI_VIA_1, MCP23S17_IODIRA, 0x00, 0x00);			// Set All Pins To Output
+//	MCP23S17_WriteRegisterPair(MCP23S17_SPI_VIA_1, MCP23S17_GPIOA,  0x55, 0xAA);
 
 	// Draw All The Constant Text To The Screen
 	char szTempString[128];
@@ -655,24 +681,24 @@ int main()
 
 	while(true)
 	{
-		u32 uTextXPos = 22;
+		// u32 uTextXPos = 22;
 
-		// Loop For Both VIA's
-		for (u32 uViaIndex=0; uViaIndex<2; ++uViaIndex)
-		{
-			// Loop For All 16 Registers
-			for (u32 uRegisterIndex=0; uRegisterIndex<16; ++uRegisterIndex)
-			{ 
-				// Write The Register Values To The Appropriate Screen Position
-				const uint16_t uHexPair = byteToHex(s_aViaRegs[uViaIndex].m_aReg[uRegisterIndex]);
-				DrawPetsciiChar((uTextXPos    ) << 3, (20 + uRegisterIndex) << 3, uHexPair >> 8, RGB_YELLOW);
-				DrawPetsciiChar((uTextXPos + 1) << 3, (20 + uRegisterIndex) << 3, uHexPair & 255, RGB_YELLOW);
+		// // Loop For Both VIA's
+		// for (u32 uViaIndex=0; uViaIndex<2; ++uViaIndex)
+		// {
+		// 	// Loop For All 16 Registers
+		// 	for (u32 uRegisterIndex=0; uRegisterIndex<16; ++uRegisterIndex)
+		// 	{ 
+		// 		// Write The Register Values To The Appropriate Screen Position
+		// 		const uint16_t uHexPair = byteToHex(s_aViaRegs[uViaIndex].m_aReg[uRegisterIndex]);
+		// 		DrawPetsciiChar((uTextXPos    ) << 3, (20 + uRegisterIndex) << 3, uHexPair >> 8, RGB_YELLOW);
+		// 		DrawPetsciiChar((uTextXPos + 1) << 3, (20 + uRegisterIndex) << 3, uHexPair & 255, RGB_YELLOW);
 
-				// Call This Often Or The Input Buffer Will Overflow!!!
-				ProcessVIA();
-			}
+		// 		// Call This Often Or The Input Buffer Will Overflow!!!
+		// 		ProcessVIA();
+		// 	}
 
-			uTextXPos += 30;
-		}
+		// 	uTextXPos += 30;
+		// }
 	}
 }
