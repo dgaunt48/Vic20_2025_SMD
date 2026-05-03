@@ -1,56 +1,96 @@
 //------------------------------------------------------------------------------------------------
-//----                                                                                        ----
+//---- VIA 6522 ... 2026 Dave Gaunt                                                           ----
 //------------------------------------------------------------------------------------------------
-//----                                                                                        ----
+//---- Version 0.1                                                                            ----
 //------------------------------------------------------------------------------------------------
 #include <stdio.h>
 #include "types.h"
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 
-#include "hardware/pio.h"
-#include "hardware/dma.h"
-#include "hardware/spi.h"
+#include "vga111.h"
 
-#include "hsync.pio.h"
-#include "vsync.pio.h"
-#include "rgb.pio.h"
+enum device_pins {
+	PIN_RED = 0,
+	PIN_GREEN,
+	PIN_BLUE,
+	PIN_S02_READ,
+	PIN_HSYNC = 8,
+	PIN_VSYNC,
 
-#include "VicChars.h"
+	PIN_RESET,
+	PIN_ADDRESS_CS1,		/* ADDRESS BIT 4 OR 5 On VIC */
+	PIN_IO0,				/* CS2 ACTIVE LOW */
+	PIN_READ_WRITE,
+	PIN_IRQ,
 
-#define VGA_RESOLUTION_X    	(640)
-#define VGA_RESOLUTION_Y  		(480)
-#define TERMINAL_CHARS_WIDE		(VGA_RESOLUTION_X >> 3)
-#define TERMINAL_CHARS_HIGH		(VGA_RESOLUTION_Y >> 3)
+	PIN_DATA_BIT0,
+	PIN_DATA_BIT1,
+	PIN_DATA_BIT2,
+	PIN_DATA_BIT3,
+	PIN_DATA_BIT4,
+	PIN_DATA_BIT5,
+	PIN_DATA_BIT6,
+	PIN_DATA_BIT7,
 
-enum vga_pins {
-	PIN_ADDRESS_BIT0 = 0,
+	PIN_CLK,				/* S02 - Data Transfer Occurs Only When Phase 2 Clock Is High */
+	PIN_ADDRESS_BIT0,
 	PIN_ADDRESS_BIT1,
 	PIN_ADDRESS_BIT2,
 	PIN_ADDRESS_BIT3,
-	PIN_ADDRESS_BIT4,
-	PIN_ADDRESS_BIT5,
-	PIN_READ_WRITE,
-	PIN_RESET,
-	PIN_IRQ,
-	PIN_NMI,
-	PIN_IO0 = 22,
-	PIN_S02 = 26,
-	PIN_VSYNC,
-	PIN_HSYNC,
-	PIN_RED,
-	PIN_GREEN,
-	PIN_BLUE
+
+	PIN_PORT_A = 32,
+	PIN_PORT_B = 40
 };
 
-enum rgbColours {RGB_BLACK, RGB_RED, RGB_GREEN, RGB_YELLOW, RGB_BLUE, RGB_MAGENTA, RGB_CYAN, RGB_WHITE};
-
-u8 aVGAScreenBuffer[(VGA_RESOLUTION_X * VGA_RESOLUTION_Y) >> 1];
-u8* address_pointer = aVGAScreenBuffer;
+static_assert(23 == PIN_CLK, "Clock must be on PIN 23!");
 
 //------------------------------------------------------------------------------------------------
 //----                                                                                        ----
 //------------------------------------------------------------------------------------------------
+enum via_register_names
+{
+	VIA_REG_PORTB = 0,
+	VIA_REG_PORTA,
+	VIA_REG_DATA_DIRB,
+	VIA_REG_DATA_DIRA,
+	VIA_REG_TIMER1_L,
+	VIA_REG_TIMER1_H,
+	VIA_REG_TIMER1_LATCH_L,
+	VIA_REG_TIMER1_LATCH_H,
+	VIA_REG_TIMER2_L,
+	VIA_REG_TIMER2_H,
+	VIA_REG_SHIFT,
+	VIA_REG_AUXILIARY_CONTROL,
+	VIA_REG_PERIPHERAL_CONTROL,
+	VIA_REG_INTERRUPT_FLAGS,
+	VIA_REG_INTERRUPT_ENABLE,
+	VIA_REG_PORTA_NO_HANDSHAKE
+};
+
+// Register Name Strings For Debug View.
+static const char s_aszRegisterNames[16][16] =
+{
+/*  "123456789ABCDEF"	*/
+	"Port B",
+	"Port A",
+	"Dir B",
+	"Dir A",
+	"Timer 1 L",
+	"Timer 1 H",
+	"T1 Latch L",
+	"T1 Latch H",
+	"Timer 2 L",
+	"Timer 2 H",
+	"Shift Reg",
+	"Aux Ctrl",
+	"Periph Ctrl",
+	"Int Flags",
+	"Int Enable",
+	"PA No HShake"
+/*  "123456789ABCDEF"	*/
+};
+
 enum via_irq_flags
 {
 	VIA_IRQ_CA2 = 0,
@@ -112,29 +152,7 @@ typedef struct
 } ViaRegisters;
 static_assert(sizeof(ViaRegisters) == 16);
 
-static const char s_aszRegisterNames[16][16] =
-{
-/*  "123456789ABCDEF"	*/
-	"Port B",
-	"Port A",
-	"Dir B",
-	"Dir A",
-	"Timer 1 L",
-	"Timer 1 H",
-	"T1 Latch L",
-	"T1 Latch H",
-	"Timer 2 L",
-	"Timer 2 H",
-	"Shift Reg",
-	"Aux Ctrl",
-	"Periph Ctrl",
-	"Int Flags",
-	"Int Enable",
-	"PA No HShake"
-/*  "123456789ABCDEF"	*/
-};
-
-static volatile ViaRegisters s_aViaRegs[2] = {0};
+static volatile ViaRegisters s_viaRegs = {0};
 
 typedef struct
 {
@@ -149,234 +167,16 @@ static volatile u8 s_uRegTail = 15;
 //------------------------------------------------------------------------------------------------
 //----                                                                                        ----
 //------------------------------------------------------------------------------------------------
-void initVGA()
-{
-	// Choose which PIO instance to use (there are two instances, each with 4 state machines)
-	PIO pio = pio0;
-	const uint hsync_offset = pio_add_program(pio, &hsync_program);
-	const uint vsync_offset = pio_add_program(pio, &vsync_program);
-	const uint rgb_offset = pio_add_program(pio, &rgb_program);
-
-	// Manually select a few state machines from pio instance pio0.
-	uint hsync_sm = 0;
-	uint vsync_sm = 1;
-	uint rgb_sm = 2;
-	hsync_program_init(pio, hsync_sm, hsync_offset, PIN_HSYNC);
-	vsync_program_init(pio, vsync_sm, vsync_offset, PIN_VSYNC);
-	rgb_program_init(pio, rgb_sm, rgb_offset, PIN_RED);
-
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
-	// ============================== PIO DMA Channels =================================================
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	// DMA channels - 0 sends color data, 1 reconfigures and restarts 0
-	int rgb_chan_0 = 0;
-	int rgb_chan_1 = 1;
-
-	// Channel Zero (sends color data to PIO VGA machine)
-	dma_channel_config c0 = dma_channel_get_default_config(rgb_chan_0);  	// default configs
-	channel_config_set_transfer_data_size(&c0, DMA_SIZE_8);              	// 8-bit txfers
-	channel_config_set_read_increment(&c0, true);                        	// yes read incrementing
-	channel_config_set_write_increment(&c0, false);                      	// no write incrementing
-	channel_config_set_dreq(&c0, DREQ_PIO0_TX2) ;                        	// DREQ_PIO0_TX2 pacing (FIFO)
-	channel_config_set_chain_to(&c0, rgb_chan_1);                        	// chain to other channel
-
-	dma_channel_configure
-	(
-		rgb_chan_0,                                                        	// Channel to be configured
-		&c0,                                                               	// The configuration we just created
-		&pio->txf[rgb_sm],                                                 	// write address (RGB PIO TX FIFO)
-		&aVGAScreenBuffer,                                                 	// The initial read address (pixel color array)
-		(VGA_RESOLUTION_X * VGA_RESOLUTION_Y) >> 1,                        	// Number of transfers; in this case each is 1 byte.
-		false                                                              	// Don't start immediately.
-	);
-
-	// Channel One (reconfigures the first channel)
-	dma_channel_config c1 = dma_channel_get_default_config(rgb_chan_1);  	// default configs
-	channel_config_set_transfer_data_size(&c1, DMA_SIZE_32);             	// 32-bit txfers
-	channel_config_set_read_increment(&c1, false);                       	// no read incrementing
-	channel_config_set_write_increment(&c1, false);                      	// no write incrementing
-	channel_config_set_chain_to(&c1, rgb_chan_0);                        	// chain to other channel
-
-	dma_channel_configure
-	(
-		rgb_chan_1,                         	// Channel to be configured
-		&c1,                                	// The configuration we just created
-		&dma_hw->ch[rgb_chan_0].read_addr,  	// Write address (channel 0 read address)
-		&address_pointer,                   	// Read address (POINTER TO AN ADDRESS)
-		1,                                 	 	// Number of transfers, in this case each is 4 byte
-		false                               	// Don't start immediately.
-	);
-
-  /////////////////////////////////////////////////////////////////////////////////////////////////////
-  /////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	// Initialize PIO state machine counters. This passes the information to the state machines
-	// that they retrieve in the first 'pull' instructions, before the .wrap_target directive
-	// in the assembly. Each uses these values to initialize some counting registers.
-	#define H_ACTIVE   655    // (active + frontporch - 1) - one cycle delay for mov
-	#define V_ACTIVE   479    // (active - 1)
-	#define RGB_ACTIVE 319    // (horizontal active)/2 - 1
-	// #define RGB_ACTIVE 639 // change to this if 1 pixel/byte
-	pio_sm_put_blocking(pio, hsync_sm, H_ACTIVE);
-	pio_sm_put_blocking(pio, vsync_sm, V_ACTIVE);
-	pio_sm_put_blocking(pio, rgb_sm, RGB_ACTIVE);
-
-	// Start the two pio machine IN SYNC
-	// Note that the RGB state machine is running at full speed,
-	// so synchronization doesn't matter for that one. But, we'll
-	// start them all simultaneously anyway.
-	pio_enable_sm_mask_in_sync(pio, ((1u << hsync_sm) | (1u << vsync_sm) | (1u << rgb_sm)));
-
-	// Start DMA channel 0. Once started, the contents of the pixel color array
-	// will be continously DMA's to the PIO machines that are driving the screen.
-	// To change the contents of the screen, we need only change the contents
-	// of that array.
-	dma_start_channel_mask((1u << rgb_chan_0)) ;
-}
-
-//------------------------------------------------------------------------------------------------
-//----                                                                                        ----
-//------------------------------------------------------------------------------------------------
-void FilledRectangle(u32 uPositionX, u32 uPositionY, u32 uWidth, u32 uHeight, u32 uColour)
-{
-	if (uPositionX + uWidth >= VGA_RESOLUTION_X)
-		uWidth = VGA_RESOLUTION_X - uPositionX;
-
-	if (uPositionY + uHeight >= VGA_RESOLUTION_Y)
-		uHeight = VGA_RESOLUTION_Y - uPositionY;
-
-	if ((uWidth > 0) && (uHeight > 0))
-	{
-		u32 uPixelOffset = ((uPositionY * VGA_RESOLUTION_X) + uPositionX) >> 1;
-
-		if (uPositionX & 1)
-		{
-			u32 uOffset = uPixelOffset++;
-			--uWidth;
-
-			for(u32 y=0; y<uHeight; ++y)
-			{
-				aVGAScreenBuffer[uOffset] = (aVGAScreenBuffer[uOffset] & 0b11000111) | (uColour << 3);
-				uOffset += VGA_RESOLUTION_X >> 1;
-			}
-		}
-
-		while (uWidth > 1)
-		{
-		u32 uOffset = uPixelOffset++;
-		uWidth -= 2;
-
-		for(u32 y=0; y<uHeight; ++y)
-		{
-			aVGAScreenBuffer[uOffset] = (uColour << 3) | uColour;
-			uOffset += VGA_RESOLUTION_X >> 1;
-		}
-		}
-
-		if (1 == uWidth)
-		{
-			for(u32 y=0; y<uHeight; ++y)
-			{
-				aVGAScreenBuffer[uPixelOffset] = (aVGAScreenBuffer[uPixelOffset] & 0b11111000) | uColour;
-				uPixelOffset += VGA_RESOLUTION_X >> 1;
-			}
-		}
-	}
-}
-
-//------------------------------------------------------------------------------------------------
-//----                                                                                        ----
-//------------------------------------------------------------------------------------------------
-void DrawPetsciiChar(const u32 uXPos, const u32 uYPos, const u8 uChar, const u8 uColour)
-{
-	for (u32 uLine=0; uLine<8; ++uLine)
-	{
-		u32 uPixelOffset = ((((uYPos + uLine) * VGA_RESOLUTION_X ) + uXPos) >> 1) + 3;
-		u32 uCharLine = VicChars901460_03[2048 + (uChar << 3) + uLine];
-
-		for (u32 x=0; x<4; ++x)
-		{
-			u8 uPixelPair = 0;
-
-			if (uCharLine & 2)
-				uPixelPair = uColour;
-
-			if (uCharLine & 1)
-				uPixelPair |= (uColour << 3);
-
-			aVGAScreenBuffer[uPixelOffset--] = uPixelPair;
-			uCharLine >>= 2;
-		}
-	}
-}
-
-//------------------------------------------------------------------------------------------------
-//----                                                                                        ----
-//------------------------------------------------------------------------------------------------
-void DrawString(uint32_t uCharX, uint32_t uCharY, const char* pszString, const uint8_t uColour)
-{
-	while (*pszString)
-	{
-		if (uCharX >= (TERMINAL_CHARS_WIDE-1))
-		{
-			uCharX = 1;
-			++uCharY;
-		}
-
-		if (uCharY >= (TERMINAL_CHARS_HIGH-1))
-			return;
-
-		uint8_t c = *pszString++;
-
-		if (c >= '`')
-			c -= '`';
-
-		DrawPetsciiChar(uCharX << 3, uCharY << 3, c, uColour);
-		++uCharX;
-	}
-}
-
-//------------------------------------------------------------------------------------------------
-//----                                                                                        ----
-//------------------------------------------------------------------------------------------------
-static const uint8_t aHexTable[16] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
-
-static inline uint16_t byteToHex(const uint8_t uByte)
-{
-	return (aHexTable[(uByte >> 4) & 15] << 8) | aHexTable[uByte & 15];
-}
-
-//------------------------------------------------------------------------------------------------
-//----                                                                                        ----
-//------------------------------------------------------------------------------------------------
-void FormatHexDumpLine(uint32_t uCharX, uint32_t uCharY, const uint32_t uAddress, const uint8_t* pLineBuffer, const uint8_t uColour)
-{
-	// Write Address Offset in 6 byte hex.
-	for(int i=5; i>=0; --i)
-		DrawPetsciiChar((uCharX + 5 - i) << 3, uCharY << 3, aHexTable[(uAddress >> (i << 2)) & 15], uColour);
-
-	// Write 16 bytes worth of hex values.
- 	for(uint32_t uIndex=0; uIndex<16; ++uIndex)
-	{
-	    const uint16_t uHexPair = byteToHex(pLineBuffer[uIndex]);
-		DrawPetsciiChar((uCharX + 8 + (uIndex * 3)) << 3, uCharY << 3, uHexPair >> 8, uColour);
-		DrawPetsciiChar((uCharX + 9 + (uIndex * 3)) << 3, uCharY << 3, uHexPair & 255, uColour);
-
-		// Write ASCII version of byte.
-		DrawPetsciiChar((uCharX + 57 + uIndex) << 3, uCharY << 3, pLineBuffer[uIndex], uColour);
-	}
-}
-
-//------------------------------------------------------------------------------------------------
-//----                                                                                        ----
-//------------------------------------------------------------------------------------------------
-#define __scratch_x_func(func_name)   __scratch_x(__STRING(func_name)) func_name
-static void __scratch_x_func(function_core1)(void)
+static void __not_in_flash_func(function_core1)(void)
 {
 	save_and_disable_interrupts();
+
+	u32 uS02 = 1;
  	u32 uLow32Pins = gpioc_lo_in_get();
-	u32 uS02 = (uLow32Pins >> PIN_S02) & 1;
+
+	// Wait for IO0 To Return Hi AND S02 To Assert Low
+	while ( (0 == ((uLow32Pins >> PIN_IO0) & 1)) || (1 == ((uLow32Pins >> PIN_CLK) & 1)) )
+		uLow32Pins = gpioc_lo_in_get();
 
 	while(true)
  	{
@@ -385,197 +185,201 @@ static void __scratch_x_func(function_core1)(void)
 	 		uLow32Pins = gpioc_lo_in_get();
 
 			// If S02 Is Hi
-			if ((uLow32Pins >> PIN_S02) & 1)
+			if ((uLow32Pins >> PIN_CLK) & 1)
 			{
-				// And IO0 Is Low Then Process VIA IO
-				if (0 == ((uLow32Pins >> PIN_IO0) & 1))
-					break;
-
 				if (0 == uS02)
 				{
-					// S02 Has Transitioned From Low To Hi - Check If The Timer Is Non-Zero
-					if (0 != s_aViaRegs[1].m_uTimer1)
-					{
-						// If the Timer Will Go To Zero
-						if (1 == s_aViaRegs[1].m_uTimer1)
-						{
-							s_aViaRegs[1].m_uTimer1 = s_aViaRegs[1].m_uTimer1_Latch;
-							s_aViaRegs[1].m_uInterruptFlags |= (1 << VIA_IRQ_TIMER1);
-						}
-						else
-						{
-							s_aViaRegs[1].m_uTimer1--;
-						}
-					}
+					// And IO0 Is Low Then Process VIA IO
+					if ((0 == ((uLow32Pins >> PIN_IO0) & 1)) && ((uLow32Pins >> PIN_ADDRESS_CS1) & 1))
+						break;
 
-					// We Have Finished For This Transition Of S02
+						// We Have Finished For This Transition Of S02
 					uS02 = 1;
 				}
 			}
 			else
 			{
+				if (1 == uS02)
+				{
+					// S02 Has Transitioned From Hi To Low - Check If The Timer Is Non-Zero
+					if (0 != s_viaRegs.m_uTimer1)
+					{
+						// If the Timer Will Go To Zero
+						if (1 == s_viaRegs.m_uTimer1)
+						{
+							s_viaRegs.m_uTimer1 = s_viaRegs.m_uTimer1_Latch;
+							s_viaRegs.m_uInterruptFlags |= (1 << VIA_IRQ_TIMER1);
+						}
+						else
+						{
+							s_viaRegs.m_uTimer1--;
+						}
+					}
+
+					u32 uHiPins = gpioc_hi_in_get();
+					s_viaRegs.m_u8PortA = (uHiPins >> (PIN_PORT_A - 32)) & 0xFF;
+					s_viaRegs.m_u8PortA_NoHandshake = (uHiPins >> (PIN_PORT_A - 32)) & 0xFF;
+				}
+
 				// S02 Has Transitioned From Hi To Low
 				uS02 = 0;
 			}
 		}
 
-		delay_120ns();
-		uLow32Pins = gpioc_lo_in_get();
-
-		if (0 == ((uLow32Pins >> PIN_READ_WRITE) & 1))
+		if ( 0 == ((uLow32Pins >> PIN_READ_WRITE) & 1) )
 		{
-			// CPU Is In Write Mode So Copy Bus To Internal Registers
-			const u32 uHi32Pins = gpioc_hi_in_get();
-			const u8 uRegTail = (s_uRegTail + 1) & 15;
+			delay_40ns();
+			uLow32Pins = gpioc_lo_in_get();
+			const u32 uRegister = (uLow32Pins >> PIN_ADDRESS_BIT0) & 0xF;
+			const u32 uData = (uLow32Pins >> PIN_DATA_BIT0) & 0xFF;
 
-			// Ring Buffer Full !!!
-		    assert(uRegTail != s_uRegHead);
-
-			// Address Bit 4 Selects VIA 1
-			if ((uLow32Pins >> PIN_ADDRESS_BIT4) & 1)
+			switch(uRegister)
 			{
-				s_aRegBuffer[uRegTail].m_uOffset = uLow32Pins & 0xF;
-				s_aRegBuffer[uRegTail].m_uData = (u8)uHi32Pins;
-				s_uRegTail = uRegTail;
+				case VIA_REG_PORTB:
+					gpioc_hi_out_xor((gpioc_hi_out_get() ^ (uData << (PIN_PORT_B - 32))) & (0xFF << (PIN_PORT_B - 32)));
+					s_viaRegs.m_u8PortB ^= (s_viaRegs.m_u8PortB ^ uData) & s_viaRegs.m_uDataDirB;
+				break;
+
+				case VIA_REG_PORTA:
+					gpioc_hi_out_xor((gpioc_hi_out_get() ^ (uData << (PIN_PORT_A - 32))) & (0xFF << (PIN_PORT_A - 32)));
+					s_viaRegs.m_u8PortA ^= (s_viaRegs.m_u8PortA ^ uData) & s_viaRegs.m_uDataDirA;
+				break;
+
+				case VIA_REG_DATA_DIRB:
+					gpioc_hi_oe_xor((gpioc_hi_oe_get() ^ (uData << (PIN_PORT_B - 32))) & (0xFF << (PIN_PORT_B - 32)));
+					s_viaRegs.m_uDataDirB = uData;
+				break;
+
+				case VIA_REG_DATA_DIRA:
+					gpioc_hi_oe_xor((gpioc_hi_oe_get() ^ (uData << (PIN_PORT_A - 32))) & (0xFF << (PIN_PORT_A - 32)));
+					s_viaRegs.m_uDataDirA = uData;
+				break;
+
+				default:
+					// Push Register Set Onto Ring Buffer.
+					const u8 uRegTail = (s_uRegTail + 1) & 15;
+					assert(uRegTail != s_uRegHead);		// Ring Buffer Is Full !!!
+					s_aRegBuffer[uRegTail].m_uOffset = (u8)uRegister;
+					s_aRegBuffer[uRegTail].m_uData = (u8)uData;
+					s_uRegTail = uRegTail;
+				break;
 			}
 
-			// Address Bit 5 Selects VIA 2	(KeyBoard, Cursor Blink Timer)
-			if ((uLow32Pins >> PIN_ADDRESS_BIT5) & 1)
-			{
-				s_aRegBuffer[uRegTail].m_uOffset = (uLow32Pins & 0xF) + 16;
-				s_aRegBuffer[uRegTail].m_uData = (u8)uHi32Pins;
-				s_uRegTail = uRegTail;
-			}
+			// Wait for IO0 To Return Hi OR S02 To Assert Low
+			// while ( (0 == ((uLow32Pins >> PIN_IO0) & 1)) && (1 == ((uLow32Pins >> PIN_CLK) & 1)) )
+			// 	uLow32Pins = gpioc_lo_in_get();
 		}
 		else
 		{
-			// CPU Is In Read Mode - So Present Data On Bus
-			if ((uLow32Pins >> PIN_ADDRESS_BIT4) & 1)
-			{
-				const u8 uData = s_aViaRegs[0].m_aReg[uLow32Pins & 0xF];
-				for(u32 uPin=0; uPin<8; ++uPin)
-				{
-					gpio_set_dir(uPin + 32, GPIO_OUT);
-					gpio_put(uPin + 32, (uData >> uPin) & 1);
-				}
-			}
+			const u32 uRegister = (uLow32Pins >> PIN_ADDRESS_BIT0) & 0xF;
+			const u8 uData = s_viaRegs.m_aReg[uRegister];
+			gpio_put_masked((0xFF << PIN_DATA_BIT0), (uData << PIN_DATA_BIT0));
 
-			if ((uLow32Pins >> PIN_ADDRESS_BIT5) & 1)
-			{
-				const u8 uData = s_aViaRegs[1].m_aReg[uLow32Pins & 0xF];
-				for(u32 uPin=0; uPin<8; ++uPin)
-				{
-					gpio_set_dir(uPin + 32, GPIO_OUT);
-					gpio_put(uPin + 32, (uData >> uPin) & 1);
-				}
+			// Set All Data Bits To Output
+			gpio_set_dir_masked((0xFF << PIN_DATA_BIT0), (0xFF << PIN_DATA_BIT0));
 
-				if (4 == (uLow32Pins & 0xF))
-					s_aViaRegs[1].m_uInterruptFlags &= ~(1 << VIA_IRQ_TIMER1);
-			}
+			// Wait for IO0 To Return Hi OR S02 To Assert Low
+			while ( (0 == ((uLow32Pins >> PIN_IO0) & 1)) && (1 == ((uLow32Pins >> PIN_CLK) & 1)) )
+				uLow32Pins = gpioc_lo_in_get();
+
+			// Get Off The Bus
+			gpio_set_dir_masked((0xFF << PIN_DATA_BIT0), 0);
+
+			// If We Read Timer1 Low Byte Clear The IRQ Flag.
+			if (VIA_REG_TIMER1_L == uRegister)
+				s_viaRegs.m_uInterruptFlags &= ~(1 << VIA_IRQ_TIMER1);
 		}
-
-		// Wait for IO0 To Return Hi OR S02 To Assert Low
-		while (0 == (((uLow32Pins >> PIN_IO0) | (~uLow32Pins >> PIN_S02)) & 1))
-			uLow32Pins = gpioc_lo_in_get();
-
-		// Get Off The Bus
-		for(u32 uPin=32; uPin<=40; ++uPin)
-			gpio_set_dir(uPin, GPIO_IN);
 	}
 }
 
 //------------------------------------------------------------------------------------------------
 //----                                                                                        ----
 //------------------------------------------------------------------------------------------------
-static u32 s_uFakeTimer = 0;
-
 void ProcessVIA(void)
 {
 	// Are There Any Register Writes On The Ring Buffer?
 	if (s_uRegHead != s_uRegTail)
 	{
-		const u32 uViaIndex = (s_aRegBuffer[s_uRegHead].m_uOffset >> 4) & 1;
 		const u8 uRegister = s_aRegBuffer[s_uRegHead].m_uOffset & 15;
 		const u8 uData = s_aRegBuffer[s_uRegHead].m_uData;
 
 		switch(uRegister)
 		{
-			
-			case 4:		// Timer 1 Low Order Counter
+			case VIA_REG_TIMER1_L:
 			{
 				// Write Data Into The Low Order Latch... Not The Counter!!!
-				s_aViaRegs[uViaIndex].m_uTimer1_Latch_L = uData;
+				s_viaRegs.m_uTimer1_Latch_L = uData;
 			}
 			break;
 
-			case 5:		// Timer 1 High Order Counter
+			case VIA_REG_TIMER1_H:
 			{
-				s_aViaRegs[uViaIndex].m_uTimer1_Latch_H = uData;
-				s_aViaRegs[uViaIndex].m_uTimer1 = s_aViaRegs[uViaIndex].m_uTimer1_Latch;
-				s_aViaRegs[uViaIndex].m_uInterruptFlags &= ~(1 << VIA_IRQ_TIMER1);
+				s_viaRegs.m_uTimer1_Latch_H = uData;
+				s_viaRegs.m_uTimer1 = s_viaRegs.m_uTimer1_Latch;
+				s_viaRegs.m_uInterruptFlags &= ~(1 << VIA_IRQ_TIMER1);
 			}
 			break;
 
-			case 6:		// Timer 1 Low Order Latch
+			case VIA_REG_TIMER1_LATCH_L:
 			{
-				s_aViaRegs[uViaIndex].m_uTimer1_Latch_L = uData;
+				s_viaRegs.m_uTimer1_Latch_L = uData;
 			}
 			break;
 
-			case 7:		// Timer 1 High Order Latch
+			case VIA_REG_TIMER1_LATCH_H:
 			{
-				s_aViaRegs[uViaIndex].m_uTimer1_Latch_H = uData;
-				s_aViaRegs[uViaIndex].m_uInterruptFlags &= ~(1 << VIA_IRQ_TIMER1);
+				s_viaRegs.m_uTimer1_Latch_H = uData;
+				s_viaRegs.m_uInterruptFlags &= ~(1 << VIA_IRQ_TIMER1);
 			}
 			break;
 
-			case 13:
-			{
-				if (uData & 0x80)
-				{
-					// Bit 7 Is High So Enable Any Specified Interrupts.
-					s_aViaRegs[uViaIndex].m_uInterruptFlags |= (uData & 0x7F);
-				}
-				else
-				{
-					// Bit 7 Is Low So Disable Any Specified Interrupts.
-					s_aViaRegs[uViaIndex].m_uInterruptFlags &= (~uData & 0x7F);
-				}
-
-				if (s_aViaRegs[uViaIndex].m_uInterruptFlags)
-					s_aViaRegs[uViaIndex].m_uInterruptFlags |= (1 << VIA_IRQ_SET_CLR);
-			}
-			break;
-
-			case 14:	// Interrupt Enable Flags
+			case VIA_REG_INTERRUPT_FLAGS:
 			{
 				if (uData & 0x80)
 				{
 					// Bit 7 Is High So Enable Any Specified Interrupts.
-					s_aViaRegs[uViaIndex].m_uInterruptEnable |= (uData & 0x7F);
+					s_viaRegs.m_uInterruptFlags |= (uData & 0x7F);
 				}
 				else
 				{
 					// Bit 7 Is Low So Disable Any Specified Interrupts.
-					s_aViaRegs[uViaIndex].m_uInterruptEnable &= (~uData & 0x7F);
+					s_viaRegs.m_uInterruptFlags &= (~uData & 0x7F);
+				}
+
+				if (s_viaRegs.m_uInterruptFlags)
+					s_viaRegs.m_uInterruptFlags |= (1 << VIA_IRQ_SET_CLR);
+			}
+			break;
+
+			case VIA_REG_INTERRUPT_ENABLE:
+			{
+				if (uData & 0x80)
+				{
+					// Bit 7 Is High So Enable Any Specified Interrupts.
+					s_viaRegs.m_uInterruptEnable |= (uData & 0x7F);
+				}
+				else
+				{
+					// Bit 7 Is Low So Disable Any Specified Interrupts.
+					s_viaRegs.m_uInterruptEnable &= (~uData & 0x7F);
 				}
 			}
 			break;
 
 			default:
-			s_aViaRegs[uViaIndex].m_aReg[uRegister] = uData;
+			s_viaRegs.m_aReg[uRegister] = uData;
 		}
 
 		s_uRegHead = (s_uRegHead + 1) & 15;
 	}
 
-	const u8 uInterrupFlags = s_aViaRegs[1].m_uInterruptFlags & s_aViaRegs[1].m_uInterruptEnable;
+	const u8 uInterrupFlags = s_viaRegs.m_uInterruptFlags & s_viaRegs.m_uInterruptEnable;
 
 	// If Any Enabled Interrupt Is Flagged The Set The Hi Bit
-	s_aViaRegs[1].m_uInterruptFlags = (uInterrupFlags) ? (1 << VIA_IRQ_SET_CLR) | uInterrupFlags : 0;
+	s_viaRegs.m_uInterruptFlags = (uInterrupFlags) ? (1 << VIA_IRQ_SET_CLR) | uInterrupFlags : 0;
 
 	// Reflect The IRQ Bit On The IO Pin.
-	gpio_put(PIN_IRQ, ((~s_aViaRegs[1].m_uInterruptFlags >> VIA_IRQ_SET_CLR) & 1));
+	gpio_put(PIN_IRQ, ((~s_viaRegs.m_uInterruptFlags >> VIA_IRQ_SET_CLR) & 1));
 }
 
 //------------------------------------------------------------------------------------------------
@@ -585,94 +389,87 @@ int main()
 {
 	stdio_init_all();
 
-	// Set All Address Pins To Input
-	for(u32 uPin=PIN_ADDRESS_BIT0; uPin<=PIN_ADDRESS_BIT5; ++uPin)
-	{
-		gpio_init(uPin);
-		gpio_set_dir(uPin, GPIO_IN);
-	}
+	gpio_init(PIN_CLK);
+	gpio_set_dir(PIN_CLK, GPIO_IN);
+
+	// Clock Is Currently Looped Back So PIN_CLK Can Be Created And Read By The Test Program.
+	gpio_init(PIN_S02_READ);
+	gpio_set_dir(PIN_S02_READ, GPIO_IN);
+
+	// CS1 Is Address Line 4 Or 5 On The VIC.
+	gpio_init(PIN_ADDRESS_CS1);
+	gpio_set_dir(PIN_ADDRESS_CS1, GPIO_IN);
+
+	gpio_init(PIN_IO0);
+	gpio_set_dir(PIN_IO0, GPIO_IN);
 
 	gpio_init(PIN_READ_WRITE);
 	gpio_set_dir(PIN_READ_WRITE, GPIO_IN);
-
-	gpio_init(PIN_RESET);
-	gpio_set_dir(PIN_RESET, GPIO_IN);
 
 	// IRQ Active Low
 	gpio_init(PIN_IRQ);
 	gpio_set_dir(PIN_IRQ, GPIO_OUT);
 	gpio_put(PIN_IRQ, true);
 
-	// NMI Active Low
-	gpio_init(PIN_NMI);
-	gpio_set_dir(PIN_NMI, GPIO_OUT);
-	gpio_put(PIN_NMI, true);
-
-	gpio_init(PIN_IO0);
-	gpio_set_dir(PIN_IO0, GPIO_IN);
-
-	gpio_init(PIN_S02);
-	gpio_set_dir(PIN_S02, GPIO_IN);
-
-	for(u32 uPin=32; uPin<48; ++uPin)
+	// Set All Data Pins To Input
+	for(u32 uPin=PIN_DATA_BIT0; uPin<=PIN_DATA_BIT7; ++uPin)
 	{
 		gpio_init(uPin);
 		gpio_set_dir(uPin, GPIO_IN);
 	}
 
+	// Set All Address Pins To Input
+	for(u32 uPin=PIN_ADDRESS_BIT0; uPin<=PIN_ADDRESS_BIT3; ++uPin)
+	{
+		gpio_init(uPin);
+		gpio_set_dir(uPin, GPIO_IN);
+	}
+
+	gpio_init(PIN_RESET);
+	gpio_set_dir(PIN_RESET, GPIO_IN);
+
+	for(u32 uPinIndex=0; uPinIndex<8; ++uPinIndex)
+	{
+		gpio_init(PIN_PORT_A + uPinIndex);
+		gpio_init(PIN_PORT_B + uPinIndex);
+
+		gpio_set_dir(PIN_PORT_A + uPinIndex, GPIO_IN);
+		gpio_set_dir(PIN_PORT_B + uPinIndex, GPIO_IN);
+
+		gpio_pull_up(PIN_PORT_A + uPinIndex);
+		gpio_pull_up(PIN_PORT_B + uPinIndex);
+	}
+
 	multicore_launch_core1(function_core1);
 
-	initVGA();
-	FilledRectangle(0, 0, VGA_RESOLUTION_X, VGA_RESOLUTION_Y, RGB_GREEN);
-	FilledRectangle(1, 1, VGA_RESOLUTION_X-2, VGA_RESOLUTION_Y-2, RGB_BLACK);
+	vga_Init(PIN_RED, PIN_HSYNC, PIN_VSYNC);
+	vga_FilledRect(0, 0, VGA_RESOLUTION_X, VGA_RESOLUTION_Y, RGB111_GREEN);
+	vga_FilledRect(1, 1, VGA_RESOLUTION_X-2, VGA_RESOLUTION_Y-2, RGB111_BLACK);
 
 	// Draw All The Constant Text To The Screen
 	char szTempString[128];
-	DrawString(20, 18, "VIA 1", RGB_CYAN);
-	DrawString(50, 18, "VIA 2", RGB_CYAN);
+	vga_DrawString(20, 18, "VIA 6522", RGB111_CYAN);
 
 	for (u32 uRegisterIndex=0; uRegisterIndex<16; ++uRegisterIndex)
 	{ 
 		sprintf(szTempString, "0x%04X", 0x9110 + uRegisterIndex);
-		DrawString(13, 20 + uRegisterIndex, szTempString, RGB_BLUE);
-		DrawString(20, 20 + uRegisterIndex, "0x", RGB_YELLOW);
-		DrawString(25, 20 + uRegisterIndex, s_aszRegisterNames[uRegisterIndex], RGB_CYAN);
-
-		sprintf(szTempString, "0x%04X", 0x9120 + uRegisterIndex);
-		DrawString(43, 20 + uRegisterIndex, szTempString, RGB_BLUE);
-		DrawString(50, 20 + uRegisterIndex, "0x", RGB_YELLOW);
-		DrawString(55, 20 + uRegisterIndex, s_aszRegisterNames[uRegisterIndex], RGB_CYAN);
+		vga_DrawString(13, 20 + uRegisterIndex, szTempString, RGB111_BLUE);
+		vga_DrawString(20, 20 + uRegisterIndex, "0x", RGB111_YELLOW);
+		vga_DrawString(25, 20 + uRegisterIndex, s_aszRegisterNames[uRegisterIndex], RGB111_CYAN);
 	}
-
-
-
-	// TODO - REMOVE - HACK TO RUN WITHOUT RESET !!!!
-	// s_aViaRegs[1].m_uTimer1 = 0x4826;
-	// s_aViaRegs[1].m_uTimer1_Latch = 0x4826;
-	// s_aViaRegs[1].m_uInterruptEnable = 0x40;
-	// TODO - REMOVE - HACK TO RUN WITHOUT RESET !!!!
-
 
 	while(true)
 	{
-		u32 uTextXPos = 22;
+		// Loop For All 16 Registers
+		for (u32 uRegisterIndex=0; uRegisterIndex<16; ++uRegisterIndex)
+		{ 
+			// Write The Register Values To The Appropriate Screen Position
+			const uint16_t uHexPair = byteToHex(s_viaRegs.m_aReg[uRegisterIndex]);
+			vga_DrawPetsciiChar(22 << 3, (20 + uRegisterIndex) << 3, uHexPair >> 8, RGB111_YELLOW);
+			vga_DrawPetsciiChar(23 << 3, (20 + uRegisterIndex) << 3, uHexPair & 255, RGB111_YELLOW);
 
-		// Loop For Both VIA's
-		for (u32 uViaIndex=0; uViaIndex<2; ++uViaIndex)
-		{
-			// Loop For All 16 Registers
-			for (u32 uRegisterIndex=0; uRegisterIndex<16; ++uRegisterIndex)
-			{ 
-				// Write The Register Values To The Appropriate Screen Position
-				const uint16_t uHexPair = byteToHex(s_aViaRegs[uViaIndex].m_aReg[uRegisterIndex]);
-				DrawPetsciiChar((uTextXPos    ) << 3, (20 + uRegisterIndex) << 3, uHexPair >> 8, RGB_YELLOW);
-				DrawPetsciiChar((uTextXPos + 1) << 3, (20 + uRegisterIndex) << 3, uHexPair & 255, RGB_YELLOW);
-
-				// Call This Often Or The Input Buffer Will Overflow!!!
-				ProcessVIA();
-			}
-
-			uTextXPos += 30;
+			// Call This Often Or The Input Buffer Will Overflow!!!
+			ProcessVIA();
 		}
 	}
 }
