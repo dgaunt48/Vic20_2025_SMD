@@ -109,7 +109,7 @@ typedef struct
 } RegisterBuffer;
 
 #define VIA_RING_BUFFER_SIZE	(64)			/* Must Be A Power Of 2! */
-static volatile RegisterBuffer s_aRegBuffer[VIA_RING_BUFFER_SIZE];
+static volatile RegisterBuffer volatile s_aRegBuffer[VIA_RING_BUFFER_SIZE];
 static volatile u8 s_uRegHead = VIA_RING_BUFFER_SIZE - 1;
 static volatile u8 s_uRegTail = VIA_RING_BUFFER_SIZE - 1;
 
@@ -174,32 +174,48 @@ enum via_irq_flags
 //------------------------------------------------------------------------------------------------
 //----                                                                                        ----
 //------------------------------------------------------------------------------------------------
-static u8 ReadVIARegister(const u8 uRegisterIndex)
+static u8 __not_in_flash_func(ReadVIARegister)(const u8 uRegisterIndex)
 {
+	// Ensure S02 is Hi
 	u32 uLow32Pins = gpioc_lo_in_get();
-
-	// Wait for S02 To Assert Low
-	while (1 == ((uLow32Pins >> PIN_S02_READ) & 1) )
+	while (0 == (uLow32Pins & (1 << PIN_S02_READ)))
+		uLow32Pins = gpioc_lo_in_get();
+		
+	// Wait for S02 To Transition Low
+	while (0 != (uLow32Pins & (1 << PIN_S02_READ)))
 		uLow32Pins = gpioc_lo_in_get();
 
-	busy_wait_at_least_cycles(500);
+	busy_wait_at_least_cycles(600);
 
 	// Put Register Address On BUS
 	gpio_put_masked(0xF << PIN_ADDRESS_BIT0, uRegisterIndex << PIN_ADDRESS_BIT0);
 
+	// KeyBoard VIA Enabled
+	gpio_put(PIN_VIA2_CS1, true);
+
 	// Enable VIA
 	gpio_put(PIN_IO0, false);
 
-	// Wait for S02 To Assert High
-	while (0 == ((uLow32Pins >> PIN_S02_READ) & 1) )
+	// Set All Data Bits To Input
+	gpioc_hi_oe_clr(0xFF);
+
+	// Wait for S02 To Transition High
+	while (0 == (uLow32Pins & (1 << PIN_S02_READ)))
 		uLow32Pins = gpioc_lo_in_get();
 
-	busy_wait_at_least_cycles(500);
-
+	busy_wait_at_least_cycles(300);
 	u32 uHi32Pins = gpioc_hi_in_get();
+
+	// Wait for S02 To Transition Low
+	while (0 != (uLow32Pins & (1 << PIN_S02_READ)))
+		uLow32Pins = gpioc_lo_in_get();
 
 	// Disable VIA
 	gpio_put(PIN_IO0, true);
+	gpio_put(PIN_VIA2_CS1, false);
+
+	// Set All Data Bits To Output
+	gpioc_hi_oe_set(0xFF);
 
 	return uHi32Pins & 0xFF;
 }
@@ -207,37 +223,51 @@ static u8 ReadVIARegister(const u8 uRegisterIndex)
 //------------------------------------------------------------------------------------------------
 //----                                                                                        ----
 //------------------------------------------------------------------------------------------------
-static void WriteVIARegister(const u8 uRegisterIndex, const u8 uValue)
+static void __not_in_flash_func(WriteVIARegister)(const u8 uRegisterIndex, const u8 uValue)
 {
+	// Ensure S02 is Hi
 	u32 uLow32Pins = gpioc_lo_in_get();
-
-	// Wait for S02 To Assert Low
-	while (1 == ((uLow32Pins >> PIN_S02_READ) & 1) )
+	while (0 == (uLow32Pins & (1 << PIN_S02_READ)))
+		uLow32Pins = gpioc_lo_in_get();
+		
+	// Wait for S02 To Transition Low
+	while (0 != (uLow32Pins & (1 << PIN_S02_READ)))
 		uLow32Pins = gpioc_lo_in_get();
 
-	busy_wait_at_least_cycles(500);
+	busy_wait_at_least_cycles(600);
 
 	// Put Register Address On BUS
 	gpio_put_masked(0xF << PIN_ADDRESS_BIT0, uRegisterIndex << PIN_ADDRESS_BIT0);
 
-	gpioc_hi_oe_set(0xFF);
-    gpioc_hi_out_xor((gpioc_hi_out_get() ^ uValue) & 0xFF);
-	gpio_put(PIN_READ_WRITE, false);				// Write Mode
+	// KeyBoard VIA Enabled
+	gpio_put(PIN_VIA2_CS1, true);
 
 	// Enable VIA
 	gpio_put(PIN_IO0, false);
 
-	// Wait for S02 To Assert High
-	while (0 == ((uLow32Pins >> PIN_S02_READ) & 1) )
+	// Set R/W To Write
+	gpio_put(PIN_READ_WRITE, false);				// Write Mode
+
+	// Put Data On Bus
+	gpioc_hi_out_xor((gpioc_hi_out_get() ^ uValue) & 0xFF);
+
+	// Wait for S02 To Transition High
+	while (0 == (uLow32Pins & (1 << PIN_S02_READ)))
 		uLow32Pins = gpioc_lo_in_get();
 
-	busy_wait_at_least_cycles(500);
+	busy_wait_at_least_cycles(300);
+	u32 uHi32Pins = gpioc_hi_in_get();
 
+	// Wait for S02 To Transition Low
+	while (0 != (uLow32Pins & (1 << PIN_S02_READ)))
+		uLow32Pins = gpioc_lo_in_get();
+
+	// Set R/W Back To Read
 	gpio_put(PIN_READ_WRITE, true);					// Read Mode
-	gpioc_hi_oe_clr(0xFF);
 
 	// Disable VIA
 	gpio_put(PIN_IO0, true);
+	gpio_put(PIN_VIA2_CS1, false);
 }
 
 //------------------------------------------------------------------------------------------------
@@ -248,9 +278,12 @@ static void PushVIARegister(const u8 uRegisterIndex, const u8 uValue)
 	// Push Register Set Onto Ring Buffer.
 	const u8 uRegTail = (s_uRegTail + 1) & (VIA_RING_BUFFER_SIZE - 1);
 	assert(uRegTail != s_uRegHead);		// Ring Buffer Is Full !!!
+	asm volatile("" ::: "memory");
 
 	s_aRegBuffer[uRegTail].m_uOffset = uRegisterIndex;
 	s_aRegBuffer[uRegTail].m_uData = uValue;
+
+	asm volatile("" ::: "memory");
 	s_uRegTail = uRegTail;
 }
 
@@ -262,33 +295,28 @@ static void __not_in_flash_func(function_core1)(void)
 	save_and_disable_interrupts();
 	u32 uLow32Pins = gpioc_lo_in_get();
 	u32 uS02 = (uLow32Pins >> PIN_S02_READ) & 1;
-	
-	// Wait for IO0 To Return Hi OR S02 To Assert Low
-	while ( (0 == ((uLow32Pins >> PIN_IO0) & 1)) || (1 == ((uLow32Pins >> PIN_S02_READ) & 1)) )
+
+	// Wait for the VIA to exit RESET
+	while (0 == (uLow32Pins >> PIN_RESET) & 1)
 		uLow32Pins = gpioc_lo_in_get();
 
-	u8 uAddress = 0;
+	sleep_ms(100);
+	WriteVIARegister(VIA_REG_INTERRUPT_ENABLE, 0xC5);
+ 	WriteVIARegister(VIA_REG_INTERRUPT_ENABLE, 0x05);
+	PushVIARegister(VIA_REG_INTERRUPT_ENABLE, ReadVIARegister(VIA_REG_INTERRUPT_ENABLE));
+ 	WriteVIARegister(VIA_REG_AUXILIARY_CONTROL, 0x40);
+	PushVIARegister(VIA_REG_AUXILIARY_CONTROL, ReadVIARegister(VIA_REG_AUXILIARY_CONTROL));
+ 	WriteVIARegister(VIA_REG_TIMER1_L, 0x06);
+	PushVIARegister(VIA_REG_TIMER1_LATCH_L, ReadVIARegister(VIA_REG_TIMER1_LATCH_L));
+ 	WriteVIARegister(VIA_REG_TIMER1_H, 0x00);
+
+	busy_wait_at_least_cycles(10000);
+	PushVIARegister(VIA_REG_INTERRUPT_FLAGS, ReadVIARegister(VIA_REG_INTERRUPT_FLAGS));
 
 	while(true)
  	{
-
-		if(uAddress)
-		{
-			WriteVIARegister(VIA_REG_DATA_DIRA, 0x55);
-			WriteVIARegister(VIA_REG_DATA_DIRB, 0xAA);
-
-//			const u8 uPortA = ReadVIARegister(VIA_REG_PORTA);
-//			PushVIARegister(VIA_REG_PORTA, uPortA);
-		}
-		else
-		{
-			const u8 uDirA = ReadVIARegister(VIA_REG_DATA_DIRA);
-			PushVIARegister(VIA_REG_DATA_DIRA, uDirA);
-			const u8 uDirB = ReadVIARegister(VIA_REG_DATA_DIRB);
-			PushVIARegister(VIA_REG_DATA_DIRB, uDirB);
-		}
-
-		uAddress = !uAddress;
+		PushVIARegister(VIA_REG_TIMER1_L, ReadVIARegister(VIA_REG_TIMER1_L));
+		busy_wait_at_least_cycles(5000);
 	}
 }
 
@@ -317,7 +345,7 @@ int main()
 
 	gpio_init(PIN_VIA2_CS1);					// VIA 2 Active High
 	gpio_set_dir(PIN_VIA2_CS1, GPIO_OUT);
-	gpio_put(PIN_VIA2_CS1, true);				// KeyBoard VIA Enabled
+	gpio_put(PIN_VIA2_CS1, false);				// KeyBoard VIA Disabled
 
 	gpio_init(PIN_READ_WRITE);
 	gpio_set_dir(PIN_READ_WRITE, GPIO_OUT);
@@ -337,21 +365,19 @@ int main()
 	for(u32 uPin=PIN_DATA_BIT0; uPin<=PIN_DATA_BIT7; ++uPin)
 	{
 		gpio_init(uPin);
-		gpio_set_dir(uPin, GPIO_IN);
+		gpio_set_dir(uPin, GPIO_OUT);
 	}
-
-	multicore_launch_core1(function_core1);
 
 	// Create The Phase 2 Clock
 	gpio_init(PIN_S02_READ);
 	gpio_set_dir(PIN_S02_READ, GPIO_IN);
 	clock_gpio_init(PIN_CLK, CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_CLK_SYS, ((float)SYS_CLK_HZ / (float)VIA_CLOCK));
 
+	multicore_launch_core1(function_core1);
+
 	vga_Init(PIN_RED, PIN_HSYNC, PIN_VSYNC);
 	vga_FilledRect(0, 0, VGA_RESOLUTION_X, VGA_RESOLUTION_Y, RGB111_GREEN);
 	vga_FilledRect(1, 1, VGA_RESOLUTION_X-2, VGA_RESOLUTION_Y-2, RGB111_BLACK);
-
-	gpio_put(PIN_RESET, true);			// Release VIA From RESET
 
 	// Draw All The Constant Text To The Screen
 	char szTempString[128];
@@ -365,15 +391,20 @@ int main()
 		vga_DrawString(VIA_REGISTER_DISPLAY_X + 13, VIA_REGISTER_DISPLAY_Y + 2 + uRegisterIndex, s_aszRegisterNames[uRegisterIndex], RGB111_CYAN);
 	}
 
+	gpio_put(PIN_RESET, true);			// Release VIA From RESET
+
 	while(true)
 	{
 		// Update The Register List From The Ring Buffer.
 		if (s_uRegHead != s_uRegTail)
 		{
-			const u8 uRegister = s_aRegBuffer[s_uRegHead].m_uOffset & (VIA_RING_BUFFER_SIZE - 1);
-			const u8 uData = s_aRegBuffer[s_uRegHead].m_uData;
+			const u8 uRegHead = (s_uRegHead + 1) & (VIA_RING_BUFFER_SIZE - 1);
+			const u8 uRegister = s_aRegBuffer[uRegHead].m_uOffset & (VIA_RING_BUFFER_SIZE - 1);
+			const u8 uData = s_aRegBuffer[uRegHead].m_uData;
 			s_viaRegs.m_aReg[uRegister] = uData;
-			s_uRegHead = (s_uRegHead + 1) & (VIA_RING_BUFFER_SIZE - 1);
+
+			asm volatile("" ::: "memory");
+			s_uRegHead = uRegHead;
 		}
 
 		for (u32 uRegisterIndex=0; uRegisterIndex<16; ++uRegisterIndex)
