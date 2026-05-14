@@ -12,6 +12,8 @@
 
 #include "vga111.h"
 
+#define GENERATE_PHASE2_CLOCK
+
 #define	VIA_REGISTER_DISPLAY_X	(20)
 #define VIA_REGISTER_DISPLAY_Y	(5)
 
@@ -300,23 +302,28 @@ static void __not_in_flash_func(function_core1)(void)
 	while (0 == (uLow32Pins >> PIN_RESET) & 1)
 		uLow32Pins = gpioc_lo_in_get();
 
-	sleep_ms(100);
 	WriteVIARegister(VIA_REG_INTERRUPT_ENABLE, 0xC5);
- 	WriteVIARegister(VIA_REG_INTERRUPT_ENABLE, 0x05);
+	WriteVIARegister(VIA_REG_INTERRUPT_ENABLE, 0x05);
 	PushVIARegister(VIA_REG_INTERRUPT_ENABLE, ReadVIARegister(VIA_REG_INTERRUPT_ENABLE));
  	WriteVIARegister(VIA_REG_AUXILIARY_CONTROL, 0x40);
 	PushVIARegister(VIA_REG_AUXILIARY_CONTROL, ReadVIARegister(VIA_REG_AUXILIARY_CONTROL));
- 	WriteVIARegister(VIA_REG_TIMER1_L, 0x06);
+ 	WriteVIARegister(VIA_REG_TIMER1_L, 0x12);
 	PushVIARegister(VIA_REG_TIMER1_LATCH_L, ReadVIARegister(VIA_REG_TIMER1_LATCH_L));
  	WriteVIARegister(VIA_REG_TIMER1_H, 0x00);
-
-	busy_wait_at_least_cycles(10000);
-	PushVIARegister(VIA_REG_INTERRUPT_FLAGS, ReadVIARegister(VIA_REG_INTERRUPT_FLAGS));
+	PushVIARegister(VIA_REG_TIMER1_LATCH_H, ReadVIARegister(VIA_REG_TIMER1_LATCH_H));
 
 	while(true)
  	{
+		u8 uViaFlags = ReadVIARegister(VIA_REG_INTERRUPT_FLAGS);
+		PushVIARegister(VIA_REG_INTERRUPT_FLAGS, uViaFlags);
+
+		if (uViaFlags & 0x40)
+		{
+			WriteVIARegister(VIA_REG_INTERRUPT_FLAGS, 0x40);
+		}
+
 		PushVIARegister(VIA_REG_TIMER1_L, ReadVIARegister(VIA_REG_TIMER1_L));
-		busy_wait_at_least_cycles(5000);
+		busy_wait_at_least_cycles(2000);
 	}
 }
 
@@ -371,9 +378,13 @@ int main()
 	// Create The Phase 2 Clock
 	gpio_init(PIN_S02_READ);
 	gpio_set_dir(PIN_S02_READ, GPIO_IN);
-	clock_gpio_init(PIN_CLK, CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_CLK_SYS, ((float)SYS_CLK_HZ / (float)VIA_CLOCK));
 
-	multicore_launch_core1(function_core1);
+#ifdef GENERATE_PHASE2_CLOCK
+	clock_gpio_init(PIN_CLK, CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_CLK_SYS, ((float)SYS_CLK_HZ / (float)VIA_CLOCK));
+#elifndef GENERATE_PHASE2_CLOCK
+	gpio_init(PIN_CLK);
+	gpio_set_dir(PIN_CLK, GPIO_IN);
+#endif
 
 	vga_Init(PIN_RED, PIN_HSYNC, PIN_VSYNC);
 	vga_FilledRect(0, 0, VGA_RESOLUTION_X, VGA_RESOLUTION_Y, RGB111_GREEN);
@@ -391,6 +402,8 @@ int main()
 		vga_DrawString(VIA_REGISTER_DISPLAY_X + 13, VIA_REGISTER_DISPLAY_Y + 2 + uRegisterIndex, s_aszRegisterNames[uRegisterIndex], RGB111_CYAN);
 	}
 
+	sleep_ms(250);						// Wait For FPGA To Start
+	multicore_launch_core1(function_core1);
 	gpio_put(PIN_RESET, true);			// Release VIA From RESET
 
 	while(true)
