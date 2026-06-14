@@ -17,10 +17,12 @@
 #define	VIA_REGISTER_DISPLAY_X	(20)
 #define VIA_REGISTER_DISPLAY_Y	(5)
 
-#define VIC_PAL_CLOCK       	(4433618)
-#define VIC_CPU_CLOCK			(VIC_PAL_CLOCK >> 2)
+#define VGA_CLOCK				(25000000)			/* 25Mhz VGA Dot Clock */
+//#define VIC_PAL_CLOCK       	(4433618)
+//#define VIC_CPU_CLOCK			(VIC_PAL_CLOCK >> 2)
 #define VIA_SLOW_CLOCK			(100000)			/* 100 khz Clock */
-#define VIA_CLOCK				(VIA_SLOW_CLOCK)
+//#define VIC_SLOW_CLOCK		(400000)			/* 400 khz Clock */
+//#define VIA_CLOCK				(VIC_SLOW_CLOCK)
 
 enum device_pins {
 	PIN_ADDRESS_BIT0 = 0,
@@ -34,14 +36,15 @@ enum device_pins {
 	PIN_IRQ,				/* VIA 2 */
 	PIN_NMI,				/* VIA 1 */
 	PIN_IO0 = 22,			/* CS2 active low */
-	PIN_CLK = 24,			/* Clock Signal Generator */
-	PIN_S02_READ = 26,
+	PIN_CLK_VGA = 24,
+	PIN_CLK_S02,
+	PIN_S02_READ,
 	PIN_VSYNC,
 	PIN_HSYNC,
 	PIN_RED,
 	PIN_GREEN,
 	PIN_BLUE,
-	PIN_DATA_BIT0 = 32,
+	PIN_DATA_BIT0,
 	PIN_DATA_BIT1,
 	PIN_DATA_BIT2,
 	PIN_DATA_BIT3,
@@ -51,7 +54,9 @@ enum device_pins {
 	PIN_DATA_BIT7
 };
 
-static_assert(24 == PIN_CLK, "Clock must be on PIN 24!");
+static_assert(24 == PIN_CLK_VGA, "VGA Clock must be on PIN 24!");
+static_assert(25 == PIN_CLK_S02, "S02 Clock must be on PIN 25!");
+static_assert(32 == PIN_DATA_BIT0, "Data Bus must be in High Bits");
 
 typedef struct
 {
@@ -182,7 +187,7 @@ static u8 __not_in_flash_func(ReadVIARegister)(const u8 uRegisterIndex)
 	u32 uLow32Pins = gpioc_lo_in_get();
 	while (0 == (uLow32Pins & (1 << PIN_S02_READ)))
 		uLow32Pins = gpioc_lo_in_get();
-		
+
 	// Wait for S02 To Transition Low
 	while (0 != (uLow32Pins & (1 << PIN_S02_READ)))
 		uLow32Pins = gpioc_lo_in_get();
@@ -231,7 +236,7 @@ static void __not_in_flash_func(WriteVIARegister)(const u8 uRegisterIndex, const
 	u32 uLow32Pins = gpioc_lo_in_get();
 	while (0 == (uLow32Pins & (1 << PIN_S02_READ)))
 		uLow32Pins = gpioc_lo_in_get();
-		
+
 	// Wait for S02 To Transition Low
 	while (0 != (uLow32Pins & (1 << PIN_S02_READ)))
 		uLow32Pins = gpioc_lo_in_get();
@@ -280,12 +285,9 @@ static void PushVIARegister(const u8 uRegisterIndex, const u8 uValue)
 	// Push Register Set Onto Ring Buffer.
 	const u8 uRegTail = (s_uRegTail + 1) & (VIA_RING_BUFFER_SIZE - 1);
 	assert(uRegTail != s_uRegHead);		// Ring Buffer Is Full !!!
-	asm volatile("" ::: "memory");
 
 	s_aRegBuffer[uRegTail].m_uOffset = uRegisterIndex;
 	s_aRegBuffer[uRegTail].m_uData = uValue;
-
-	asm volatile("" ::: "memory");
 	s_uRegTail = uRegTail;
 }
 
@@ -297,6 +299,7 @@ static void __not_in_flash_func(function_core1)(void)
 	save_and_disable_interrupts();
 	u32 uLow32Pins = gpioc_lo_in_get();
 	u32 uS02 = (uLow32Pins >> PIN_S02_READ) & 1;
+	u32 uUpdateRegisterDisplay = 0;
 
 	// Wait for the VIA to exit RESET
 	while (0 == (uLow32Pins >> PIN_RESET) & 1)
@@ -307,23 +310,31 @@ static void __not_in_flash_func(function_core1)(void)
 	PushVIARegister(VIA_REG_INTERRUPT_ENABLE, ReadVIARegister(VIA_REG_INTERRUPT_ENABLE));
  	WriteVIARegister(VIA_REG_AUXILIARY_CONTROL, 0x40);
 	PushVIARegister(VIA_REG_AUXILIARY_CONTROL, ReadVIARegister(VIA_REG_AUXILIARY_CONTROL));
- 	WriteVIARegister(VIA_REG_TIMER1_L, 0x12);
+ 	WriteVIARegister(VIA_REG_TIMER1_L, 0x06);
 	PushVIARegister(VIA_REG_TIMER1_LATCH_L, ReadVIARegister(VIA_REG_TIMER1_LATCH_L));
- 	WriteVIARegister(VIA_REG_TIMER1_H, 0x00);
+ 	WriteVIARegister(VIA_REG_TIMER1_H, 0x05);
 	PushVIARegister(VIA_REG_TIMER1_LATCH_H, ReadVIARegister(VIA_REG_TIMER1_LATCH_H));
+
+	WriteVIARegister(VIA_REG_DATA_DIRA, 0xFF);
+	WriteVIARegister(VIA_REG_PORTA, 0xCC);
 
 	while(true)
  	{
 		u8 uViaFlags = ReadVIARegister(VIA_REG_INTERRUPT_FLAGS);
-		PushVIARegister(VIA_REG_INTERRUPT_FLAGS, uViaFlags);
 
 		if (uViaFlags & 0x40)
 		{
 			WriteVIARegister(VIA_REG_INTERRUPT_FLAGS, 0x40);
+			PushVIARegister(VIA_REG_INTERRUPT_FLAGS, uViaFlags);
 		}
 
-		PushVIARegister(VIA_REG_TIMER1_L, ReadVIARegister(VIA_REG_TIMER1_L));
-		busy_wait_at_least_cycles(2000);
+		uUpdateRegisterDisplay++;
+
+		if ((uUpdateRegisterDisplay & 255) == 0)
+		{
+			u32 uRegister = (uUpdateRegisterDisplay >> 8) & 0xF;
+			PushVIARegister(uRegister, ReadVIARegister(uRegister));
+		}
 	}
 }
 
@@ -357,11 +368,11 @@ int main()
 	gpio_init(PIN_READ_WRITE);
 	gpio_set_dir(PIN_READ_WRITE, GPIO_OUT);
 	gpio_put(PIN_READ_WRITE, true);				// Read Mode
-	
+
 	gpio_init(PIN_IO0);							// Active Low
 	gpio_set_dir(PIN_IO0, GPIO_OUT);
 	gpio_put(PIN_IO0, true);
-	
+
 	gpio_init(PIN_IRQ);							// IRQ Active Low
 	gpio_set_dir(PIN_IRQ, GPIO_IN);
 
@@ -380,10 +391,13 @@ int main()
 	gpio_set_dir(PIN_S02_READ, GPIO_IN);
 
 #ifdef GENERATE_PHASE2_CLOCK
-	clock_gpio_init(PIN_CLK, CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_CLK_SYS, ((float)SYS_CLK_HZ / (float)VIA_CLOCK));
+	clock_gpio_init(PIN_CLK_VGA, CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_CLK_SYS, ((float)SYS_CLK_HZ / (float)VGA_CLOCK));
+	clock_gpio_init(PIN_CLK_S02, CLOCKS_CLK_GPOUT0_CTRL_AUXSRC_VALUE_CLK_SYS, ((float)SYS_CLK_HZ / (float)VIA_SLOW_CLOCK));
 #elifndef GENERATE_PHASE2_CLOCK
-	gpio_init(PIN_CLK);
-	gpio_set_dir(PIN_CLK, GPIO_IN);
+	gpio_init(PIN_CLK_VGA);
+	gpio_set_dir(PIN_CLK_VGA, GPIO_IN);
+	gpio_init(PIN_CLK_S02);
+	gpio_set_dir(PIN_CLK_S02, GPIO_IN);
 #endif
 
 	vga_Init(PIN_RED, PIN_HSYNC, PIN_VSYNC);
@@ -392,17 +406,17 @@ int main()
 
 	// Draw All The Constant Text To The Screen
 	char szTempString[128];
-	vga_DrawString(VIA_REGISTER_DISPLAY_X + 7, VIA_REGISTER_DISPLAY_Y, "VIA 6522", RGB111_CYAN);
+	vga_DrawString(VIA_REGISTER_DISPLAY_X, VIA_REGISTER_DISPLAY_Y, "VIA 6522 Function Test", RGB111_GREEN);
 
 	for (u32 uRegisterIndex=0; uRegisterIndex<16; ++uRegisterIndex)
-	{ 
-		sprintf(szTempString, "0x%04X", 0x9110 + uRegisterIndex);
+	{
+		sprintf(szTempString, "0x%02X", uRegisterIndex);
 		vga_DrawString(VIA_REGISTER_DISPLAY_X, VIA_REGISTER_DISPLAY_Y + 2 + uRegisterIndex, szTempString, RGB111_BLUE);
 		vga_DrawString(VIA_REGISTER_DISPLAY_X + 7, VIA_REGISTER_DISPLAY_Y + 2 + uRegisterIndex, "0x", RGB111_YELLOW);
 		vga_DrawString(VIA_REGISTER_DISPLAY_X + 13, VIA_REGISTER_DISPLAY_Y + 2 + uRegisterIndex, s_aszRegisterNames[uRegisterIndex], RGB111_CYAN);
 	}
 
-	sleep_ms(250);						// Wait For FPGA To Start
+	sleep_ms(500);						// Wait For FPGA To Start
 	multicore_launch_core1(function_core1);
 	gpio_put(PIN_RESET, true);			// Release VIA From RESET
 
@@ -415,13 +429,11 @@ int main()
 			const u8 uRegister = s_aRegBuffer[uRegHead].m_uOffset & (VIA_RING_BUFFER_SIZE - 1);
 			const u8 uData = s_aRegBuffer[uRegHead].m_uData;
 			s_viaRegs.m_aReg[uRegister] = uData;
-
-			asm volatile("" ::: "memory");
 			s_uRegHead = uRegHead;
 		}
 
 		for (u32 uRegisterIndex=0; uRegisterIndex<16; ++uRegisterIndex)
-		{ 
+		{
 			// Write The Register Values To The Appropriate Screen Position
 			const u16 uHexPair = byteToHex(s_viaRegs.m_aReg[uRegisterIndex]);
 			vga_DrawPetsciiChar((VIA_REGISTER_DISPLAY_X + 9) << 3, ((VIA_REGISTER_DISPLAY_Y + 2) + uRegisterIndex) << 3, uHexPair >> 8, RGB111_YELLOW);
