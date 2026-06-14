@@ -370,6 +370,7 @@ void ProcessVIA(void)
 			s_viaRegs.m_aReg[uRegister] = uData;
 		}
 
+		// FIXME!!!!! THIS SHOULD BE A PRE INCREMENT!!!!!
 		s_uRegHead = (s_uRegHead + 1) & 15;
 	}
 
