@@ -1,38 +1,112 @@
+; ------------------------------------------------------------------------------
+; --- 																		 ---
+; ------------------------------------------------------------------------------
 
-SCREEN_RAM	= $1000
-VIC_BASE    = $9000     	; Base register address for MOS 6560/6561
-VIA1_BASE   = $9110     	; VIA 1 (User Port / RS-232 / Control Port)
-VIA2_BASE   = $9120     	; VIA 2 (Keyboard / Cassette / Jiffy Clock)
-COLOUR_RAM	= $9400
+SCREEN_RAM	:= $1000
 
+; ------------------------------------------------------------------------------
+; --- VIC - VIDEO INTERFACE CHIP
+; ------------------------------------------------------------------------------
+VIC		    := $9000
+VIC_CR0     := VIC+$0		; Screen Origin X
+VIC_CR1     := VIC+$1		; Screen Origin Y
+VIC_CR2     := VIC+$2		; Columns / Screen Memory
+VIC_CR3     := VIC+$3		; Rows / Raster Bit 0
+VIC_RASTER  := VIC+$4		; Current Raster Line
+VIC_CR5     := VIC+$5		; Character / Screen Address Base
+VIC_SNDB    := VIC+$6		; Bass Audio
+VIC_SNDT    := VIC+$7		; Tenor Audio
+VIC_SNDA    := VIC+$8		; Alto Audio
+VIC_SNDN    := VIC+$9		; Noise Audio
+VIC_SNDVOL  := VIC+$A		; Volume & Auxiliary Colour
+VIC_POTX    := VIC+$B		; Gamepaddle 1 (X-axis) analog value
+VIC_POTY    := VIC+$C		; Gamepaddle 2 (Y-axis) analog value
+VIC_LPX     := VIC+$D		; Light Pen Horizontal (X) position
+VIC_LPY     := VIC+$E		; Light Pen Vertical (Y) position
+VIC_COLOR   := VIC+$F		; Control Register F (Border & Background Colors)
+
+; ------------------------------------------------------------------------------
+; --- VIA 1 - VERSATILE INTERFACE ADAPTER
+; ------------------------------------------------------------------------------
+VIA1        := $9110        ; VIA1 base address
+VIA1_PB     := VIA1+$0      ; Port register B
+VIA1_PA1    := VIA1+$1      ; Port register A
+VIA1_DDRB	:= VIA1+$2      ; Data direction register B
+VIA1_DDRA   := VIA1+$3      ; Data direction register A
+VIA1_T1CL   := VIA1+$4      ; Timer 1, low byte
+VIA1_T1CH   := VIA1+$5      ; Timer 1, high byte
+VIA1_T1LL   := VIA1+$6      ; Timer 1 latch, low byte
+VIA1_T1LH   := VIA1+$7      ; Timer 1 latch, high byte
+VIA1_T2CL   := VIA1+$8      ; Timer 2, low byte
+VIA1_T2CH   := VIA1+$9      ; Timer 2, high byte
+VIA1_SR     := VIA1+$A      ; Shift register
+VIA1_ACR    := VIA1+$B      ; Auxiliary control register
+VIA1_PCR    := VIA1+$C      ; Peripheral control register
+VIA1_IFR    := VIA1+$D      ; Interrupt flag register
+VIA1_IER    := VIA1+$E      ; Interrupt enable register
+VIA1_PA2    := VIA1+$F      ; Port register A w/o handshake
+
+; ------------------------------------------------------------------------------
+; --- VIA 2 - VERSATILE INTERFACE ADAPTER
+; ------------------------------------------------------------------------------
+VIA2        := $9120       	; VIA2 base address
+VIA2_PB     := VIA2+$0     	; Port register B
+VIA2_PA1    := VIA2+$1     	; Port register A
+VIA2_DDRB   := VIA2+$2     	; Data direction register B
+VIA2_DDRA   := VIA2+$3     	; Data direction register A
+VIA2_T1CL   := VIA2+$4     	; Timer 1, low byte
+VIA2_T1CH   := VIA2+$5     	; Timer 1, high byte
+VIA2_T1LL   := VIA2+$6     	; Timer 1 latch, low byte
+VIA2_T1LH   := VIA2+$7     	; Timer 1 latch, high byte
+VIA2_T2CL   := VIA2+$8     	; Timer 2, low byte
+VIA2_T2CH   := VIA2+$9     	; Timer 2, high byte
+VIA2_SR     := VIA2+$A     	; Shift register
+VIA2_ACR    := VIA2+$B     	; Auxiliary control register
+VIA2_PCR    := VIA2+$C     	; Peripheral control register
+VIA2_IFR    := VIA2+$D     	; Interrupt flag register
+VIA2_IER    := VIA2+$E     	; Interrupt enable register
+VIA2_PA2    := VIA2+$F     	; Port register A w/o handshake
+
+COLOUR_RAM	:= $9400
+
+; ------------------------------------------------------------------------------
+; --- Zero Page Allocation
+; ------------------------------------------------------------------------------
+TOP_OF_STACK	= $F8
+TEMP    		= $FB       ; 1 byte for our number
+SCREEN_PTR 		= $FC    	; 2 bytes for the 16-bit screen address
+
+; ------------------------------------------------------------------------------
+; --- CARTRIDGE HEADER
+; ------------------------------------------------------------------------------
 .segment "HEADER"
-.word   ColdStart    	   	; Address $A000 -> Points to execution entry
-.word   WarmStart       	; Address $A002 -> Points to warm start entry
+.word   COLD_START    	   	; Address $A000 -> Points to execution entry
+.word   WARM_START       	; Address $A002 -> Points to warm start entry
 .byte   $41, $30        	; "A0"
 .byte   $C3, $C2, $CD   	; "CBM" (with high bits set)
 
 .segment "CODE"
 
-ColdStart:
-WarmStart:
-	SEI               		; Disable interrupts
-	CLD                 	; Clear decimal mode
-	LDX 	#$FF
-	TXS                 	; Initialize stack pointer
+; ------------------------------------------------------------------------------
+; --- 
+; ------------------------------------------------------------------------------
+COLD_START:
+WARM_START:
+	SEI               		; Disable Interrupts
+	CLD                 	; Clear Decimal Mode
+	LDX 	#TOP_OF_STACK
+	TXS                 	; Initialise Stack Pointer
 	
-	LDA     #$00
-	STA     VIA1_BASE+$0B   ; VIA 1 Auxiliary Control Register -> 0
-	STA     VIA1_BASE+$0E   ; VIA 1 Interrupt Enable Register (Clear all bits)
-	STA     VIA2_BASE+$0B   ; VIA 2 Auxiliary Control Register -> 0
-	STA     VIA2_BASE+$0E   ; VIA 2 Interrupt Enable Register (Clear all bits)
-	
-	; Enable latching/disable interrupts clearly by writing with MSB low
-	LDA     #$7F
-	STA     VIA1_BASE+$0E   ; Clear all interrupt enable bits on VIA 1
-	STA     VIA2_BASE+$0E   ; Clear all interrupt enable bits on VIA 2
+	LDA     #$00			; Clear Auxiliary Control Registers
+	STA     VIA1_ACR
+	STA     VIA2_ACR
+
+	LDA     #$7F			; Clear Interrupt Enable Registers
+	STA     VIA1_IER
+	STA     VIA2_IER
 
 .scope
-	; Clear Zero Page ($0000-$00FF) to guarantee a known memory state
+	; Clear Zero Page ($0000-$00FF)
 	LDX     #$00
 	LDA     #$00
 LOOP:
@@ -48,29 +122,46 @@ LOOP:
 	LDX     #16
 LOOP:
 	LDA     VIC_DATA-1,X
-	STA     VIC_BASE-1,X
+	STA     VIC_CR0-1,X
 	DEX
 	BNE     LOOP
 .endscope
 
 .scope
 	; Write "HELLO WORLD" To The Screen
-	LDX     #11
+	LDX     #8
 LOOP:
 	LDA     HEADING-1,X
-	STA     SCREEN_RAM-1,X
+	STA     SCREEN_RAM-1+5,X
 	DEX
 	BNE     LOOP
 .endscope
 
-LOOP:
+	LDA     #$FF
+	STA     VIA2_DDRB
+
+	LDA     #$7F
+	STA     VIA2_PB
+
 	LDA 	#$1B
-	STA 	VIC_BASE+$0F  	; Store in VIC border/screen register
-	JSR 	DELAY           ; Wait a fraction of a second
-	LDA 	#$1A
-	STA 	VIC_BASE+$0F    ; Store it
-	JSR 	DELAY           ; Wait again
-	JMP 	LOOP            ; Repeat infinitely
+	STA 	VIC_COLOR
+LOOP:
+
+	LDA		VIA2_PB
+	STA		TEMP
+	ASL		A
+	ROL		VIA2_PB
+
+	JSR		HEXOUT
+	JSR 	DELAY
+
+;	LDA 	#$1A
+;	STA 	VIC_COLOR
+;	JSR		HEXOUT
+;	INC		TEMP
+;	JSR 	DELAY
+
+	JMP 	LOOP
 
 ; ------------------------------------------------------------------------------
 ; --- DELAY
@@ -105,8 +196,44 @@ LOOP:
 	RTS
 .endproc
 
+; ------------------------------------------------------------------------------
+; --- HEXOUT
+; ------------------------------------------------------------------------------
+HEXOUT:
+	LDA 	#<SCREEN_RAM
+	STA 	SCREEN_PTR
+	LDA		#>SCREEN_RAM
+	STA 	SCREEN_PTR+1
+	LDY 	#0
+	LDA 	TEMP
+	LSR		a
+	LSR	 	a
+	LSR 	a
+	LSR 	a
+	JSR 	CONVERT_DIGIT
+	INY
+	LDA		TEMP
+	AND		#$0f
+	JSR		CONVERT_DIGIT
+	RTS
+
+; ------------------------------------------------------------------------------
+; --- CONVERT_DIGIT
+; ------------------------------------------------------------------------------
+CONVERT_DIGIT:
+	CMP 	#$0a    	; Is it 0-9 or A-F?
+	BCC 	IS_NUM
+	ADC		#$6	    	; Adjust for A-F
+IS_NUM:
+	ADC 	#$30    	; Add PETSCII offset for numbers ('0')
+	STA		(SCREEN_PTR),Y
+	RTS
+
+; ------------------------------------------------------------------------------
+; ---																		 ---
+; ------------------------------------------------------------------------------
 HEADING:
-	.byte	"hello world"
+	.byte	"via test"
 
 VIC_DATA:
 	; PAL values shown below. Swap with commented values for NTSC testing.

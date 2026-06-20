@@ -7,7 +7,7 @@
             "command": "cl65",
             "args": [
                 "-t", "vic20",
-                "-o", "${workspaceFolder}/build/DiagnosticROM.A0",
+                "-o", "${workspaceFolder}/build/VicDiagROM.a0",
                 "-C", "vic20-cart.cfg",
                 "${workspaceFolder}/DiagnosticROM.s"
             ],
