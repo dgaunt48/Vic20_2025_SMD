@@ -1,0 +1,31 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build 6502 App",
+            "type": "shell",
+            "command": "cl65",
+            "args": [
+                "-t", "vic20",
+                "-o", "${workspaceFolder}/build/DiagnosticROM.A0",
+                "-C", "vic20-cart.cfg",
+                "${workspaceFolder}/DiagnosticROM.s"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": {
+                "owner": "ca65",
+                "fileLocation": ["relative", "${workspaceFolder}"],
+                "pattern": {
+                    "regexp": "^(.*)\\((\\d+)\\):\\s+(Error|Warning):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "severity": 3,
+                    "message": 4
+                }
+            }
+        }
+    ]
+}
