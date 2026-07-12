@@ -140,7 +140,7 @@ typedef struct
 } ViaRegisters;
 static_assert(sizeof(ViaRegisters) == 16);
 
-static volatile ViaRegisters s_viaRegs = {0};
+static volatile ViaRegisters s_aViaRegs[2] = {0};
 
 //------------------------------------------------------------------------------------------------
 //----                                                                                        ----
@@ -150,6 +150,7 @@ static void __not_in_flash_func(function_core1)(void)
 	save_and_disable_interrupts();
 
 	u32 uS02 = 1;
+	u32 uViaIndex = 0;
  	u32 uLow32Pins = gpioc_lo_in_get();
 
 	// Wait for IO0 To Return Hi AND S02 To Assert Low
@@ -160,6 +161,7 @@ static void __not_in_flash_func(function_core1)(void)
  	{
 		while(true)
 		{
+			uViaIndex = 0;
 	 		uLow32Pins = gpioc_lo_in_get();
 
 			// If S02 Is Hi
@@ -170,8 +172,14 @@ static void __not_in_flash_func(function_core1)(void)
 					// S02 Has Transitioned From Low To Hi
 					uS02 = 1;
 
+					if ((uLow32Pins >> PIN_VIA1_CS1) & 1)
+						uViaIndex = 1;
+
+					if ((uLow32Pins >> PIN_VIA2_CS1) & 1)
+						uViaIndex = 2;
+						
 					// And IO0 Is Low Then Process VIA IO
-					if ((0 == ((uLow32Pins >> PIN_IO0) & 1)) && ((uLow32Pins >> PIN_VIA2_CS1) & 1))
+					if ((0 == ((uLow32Pins >> PIN_IO0) & 1)) && (0 != uViaIndex ))
 						break;
 				}
 			}
@@ -182,12 +190,12 @@ static void __not_in_flash_func(function_core1)(void)
 			}
 		}
 
-		delay_40ns();
+		delay_120ns();
 		uLow32Pins = gpioc_lo_in_get();
 		const u32 uRegisterIndex = (uLow32Pins >> PIN_ADDRESS_BIT0) & 0xF;
 		const u32 uHigh32Pins = gpioc_hi_in_get();
 		const u32 uData = (uHigh32Pins >> (PIN_DATA_BIT0 - 32)) & 0xFF;
-		s_viaRegs.m_aReg[uRegisterIndex] = uData;
+		s_aViaRegs[uViaIndex - 1].m_aReg[uRegisterIndex] = uData;
 	}
 }
 
@@ -202,6 +210,9 @@ int main()
 	gpio_set_dir(PIN_S02_READ, GPIO_IN);
 
 	// CS1 Is Address Line 4 Or 5 On The VIC.
+	gpio_init(PIN_VIA1_CS1);
+	gpio_set_dir(PIN_VIA1_CS1, GPIO_IN);
+
 	gpio_init(PIN_VIA2_CS1);
 	gpio_set_dir(PIN_VIA2_CS1, GPIO_IN);
 
@@ -243,25 +254,38 @@ int main()
 
 	// Draw All The Constant Text To The Screen
 	char szTempString[128];
-	vga_DrawString(20, 18, "VIA 6522 Bus Snoop", RGB111_MAGENTA);
+	vga_DrawString(28, 18, "VIA 6522 Bus Snoop", RGB111_MAGENTA);
 
 	for (u32 uRegisterIndex=0; uRegisterIndex<16; ++uRegisterIndex)
 	{ 
 		sprintf(szTempString, "0x%04X", 0x9110 + uRegisterIndex);
 		vga_DrawString(13, 20 + uRegisterIndex, szTempString, RGB111_BLUE);
+		szTempString[4] = '2';
+		vga_DrawString(43, 20 + uRegisterIndex, szTempString, RGB111_BLUE);
+
 		vga_DrawString(20, 20 + uRegisterIndex, "0x", RGB111_YELLOW);
+		vga_DrawString(50, 20 + uRegisterIndex, "0x", RGB111_YELLOW);
+
 		vga_DrawString(25, 20 + uRegisterIndex, s_aszRegisterNames[uRegisterIndex], RGB111_CYAN);
+		vga_DrawString(55, 20 + uRegisterIndex, s_aszRegisterNames[uRegisterIndex], RGB111_CYAN);
 	}
 
 	while(true)
 	{
+		u16 uHexPair;
+
 		// Loop For All 16 Registers
 		for (u32 uRegisterIndex=0; uRegisterIndex<16; ++uRegisterIndex)
 		{ 
 			// Write The Register Values To The Appropriate Screen Position
-			const uint16_t uHexPair = byteToHex(s_viaRegs.m_aReg[uRegisterIndex]);
+			uHexPair = byteToHex(s_aViaRegs[0].m_aReg[uRegisterIndex]);
 			vga_DrawPetsciiChar(22 << 3, (20 + uRegisterIndex) << 3, uHexPair >> 8, RGB111_YELLOW);
 			vga_DrawPetsciiChar(23 << 3, (20 + uRegisterIndex) << 3, uHexPair & 255, RGB111_YELLOW);
+
+			// Write The Register Values To The Appropriate Screen Position
+			uHexPair = byteToHex(s_aViaRegs[1].m_aReg[uRegisterIndex]);
+			vga_DrawPetsciiChar(52 << 3, (20 + uRegisterIndex) << 3, uHexPair >> 8, RGB111_YELLOW);
+			vga_DrawPetsciiChar(53 << 3, (20 + uRegisterIndex) << 3, uHexPair & 255, RGB111_YELLOW);
 		}
 	}
 }
