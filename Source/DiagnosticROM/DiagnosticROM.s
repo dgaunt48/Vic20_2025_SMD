@@ -128,7 +128,7 @@ LOOP:
 .endscope
 
 .scope
-	; Write "HELLO WORLD" To The Screen
+	; Write "VIA TEST" To The Screen
 	LDX     #8
 LOOP:
 	LDA     HEADING-1,X
