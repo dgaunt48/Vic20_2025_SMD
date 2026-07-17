@@ -1,11 +1,11 @@
 # Source Code For Vic 20 SMD Recreation
-VIA FPGA Core is now running except for unimplemented timer 2.  Will be ported into this project when the new IO board design arrives from JLC.
+VIA 6522 FPGA Core is now running and passing the diagnostic cartridge tests.
 
 ## DiagnosticROM
 Cut down diagnostic 6502 source so i can target individual test conditions.  Full Source 
 to vc-20-diag.324173-01_blk5.bin is in my CBM_Flash_ROMs\Vic20_DiagROM repository.
 
-## VIA_6522
+## VIA_6522_Emulation
 Start of a software emulated 6522.  Will probably end up with the VIA's on the iCE40,
 but wanted to do some tests to see if emulation is a viable alternative.
 
