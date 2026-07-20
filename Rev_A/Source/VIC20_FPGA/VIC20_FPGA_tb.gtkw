@@ -1,0 +1,26 @@
+[*] GTKWave display configuration for 'apio sim VIC20_FPGA_tb.v'
+[*] THIS FILE WAS GENERATED AUTOMATICALLY BY APIO.
+[*] DO NOT EDIT IT MANUALLY!
+[*] To customize this file, run 'apio sim VIC20_FPGA_tb.v'
+[*] and save the file from GTKWave.
+
+[*] GTKWave Analyzer v3.4.0 (w)1999-2022 BSI
+
+[*]
+VIC20_FPGA_TB.bCA1
+VIC20_FPGA_TB.bCA2
+VIC20_FPGA_TB.bCB1
+VIC20_FPGA_TB.bCB2
+VIC20_FPGA_TB.bCS
+VIC20_FPGA_TB.bCS_n
+VIC20_FPGA_TB.bFPGACoreClock
+VIC20_FPGA_TB.bIRQ_n
+VIC20_FPGA_TB.bPhase2Clock
+VIC20_FPGA_TB.bRead
+VIC20_FPGA_TB.bReset_n
+VIC20_FPGA_TB.DURATION
+VIC20_FPGA_TB.nData[7:0]
+VIC20_FPGA_TB.nPortA[7:0]
+VIC20_FPGA_TB.nPortB[7:0]
+VIC20_FPGA_TB.nRS[3:0]
+VIC20_FPGA_TB.nWriteData[7:0]

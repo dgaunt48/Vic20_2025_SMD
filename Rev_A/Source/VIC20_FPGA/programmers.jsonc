@@ -1,0 +1,7 @@
+{
+  "dave-iceprog":
+  {
+    "command": "iceprog",
+    "args": "-d i:0x0403:0x6014"
+  }
+}
