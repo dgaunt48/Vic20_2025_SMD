@@ -1,45 +1,46 @@
-set_io nData[0]             1       # 8 Bit Data Bus
-set_io nData[1]             2
-set_io nData[2]             3
-set_io nData[3]             4
-set_io nData[4]             7
-set_io nData[5]             8
-set_io nData[6]             9
-set_io nData[7]             10
+set_io nData[0]				97		# 8 Bit Data Bus
+set_io nData[1]				99
+set_io nData[2]				102
+set_io nData[3]				105
+set_io nData[4]				107
+set_io nData[5]				110
+set_io nData[6]				106
+set_io nData[7]				104
 
-set_io bCA1                 15
-set_io bCA2                 16
-set_io bCB1                 17
-set_io bCB2                 18
+set_io bCA2					112
+set_io bCB2					114
+set_io bIRQ_n				119		# IRQ_n Active Low Open Drain IRQ Signal
+set_io bReset_n				117		# Reset VIA Active Low
 
-set_io bPhase2Clock         20		# Vic20 1,108,404 Hz clock
-set_io bFPGACoreClock       21		# 25Mhz FPGA Clock
+set_io bPhase2Clock			1		# Vic20 1,108,404 Hz clock
+set_io bRead				3		# Read = 1 / Write = 0
+set_io bCS_n				7		# Chip Select Active Low
 
-set_io bReset_n             23      # Reset VIA Active Low
-set_io bCS                  24      # Chip Select Active Hi
-set_io bCS_n                25      # Chip Select Active Low
-set_io bRead                26      # Read = 1 / Write = 0
-set_io bIRQ_n               28      # IRQ_n Active Low Open Drain IRQ Signal
+set_io bFPGACoreClock		93		# 25Mhz FPGA Clock
 
-set_io nRS[0]               31      # 4 Bit Register Address
-set_io nRS[1]               32
-set_io nRS[2]               33
-set_io nRS[3]               34
+set_io nRS[0]				73		# 4 Bit Register Address
+set_io nRS[1]				75
+set_io nRS[2]				78
+set_io nRS[3]				80
+# set_io bCS				82		# nRS[4]  Chip Select Active Hi
+set_io bCS					83		# nRS[5]  Chip Select Active Hi
+set_io bCA1					81
+set_io bCB1					79
 
-set_io nPortA[0]            37       # 8 Bit IO Data Port A
-set_io nPortA[1]            38
-set_io nPortA[2]            39
-set_io nPortA[3]            41
-set_io nPortA[4]            42
-set_io nPortA[5]            43
-set_io nPortA[6]            44
-set_io nPortA[7]            45
+set_io nPortA[0]			120		# 8 Bit IO Data Port A
+set_io nPortA[1]			122
+set_io nPortA[2]			125
+set_io nPortA[3]			134
+set_io nPortA[4]			135
+set_io nPortA[5]			130
+set_io nPortA[6]			124
+set_io nPortA[7]			121
 
-set_io nPortB[0]            47       # 8 Bit IO Data Port B
-set_io nPortB[1]            48
-set_io nPortB[2]            55
-set_io nPortB[3]            56
-set_io nPortB[4]            60
-set_io nPortB[5]            61
-set_io nPortB[6]            62
-set_io nPortB[7]            63
+set_io nPortB[0]			136		# 8 Bit IO Data Port B
+set_io nPortB[1]			138
+set_io nPortB[2]			141
+set_io nPortB[3]			143
+set_io nPortB[4]			144
+set_io nPortB[5]			142
+set_io nPortB[6]			139
+set_io nPortB[7]			137
