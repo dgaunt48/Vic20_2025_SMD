@@ -1,3 +1,18 @@
+set_io bPhase2Clock			1		# Vic20 1,108,404 Hz clock
+set_io bRead				3		# Read = 1 / Write = 0
+set_io bCS_n				7		# Chip Select Active Low
+set_io bCA1					2
+set_io bCB1					4
+
+set_io nRS[0]				73		# 4 Bit Register Address
+set_io nRS[1]				75
+set_io nRS[2]				78
+set_io nRS[3]				80
+# set_io bCS				82		# nRS[4]  Chip Select Active Hi
+set_io bCS					83		# nRS[5]  Chip Select Active Hi
+
+set_io bFPGACoreClock		93		# 25Mhz FPGA Clock
+
 set_io nData[0]				97		# 8 Bit Data Bus
 set_io nData[1]				99
 set_io nData[2]				102
@@ -11,21 +26,6 @@ set_io bCA2					112
 set_io bCB2					114
 set_io bIRQ_n				119		# IRQ_n Active Low Open Drain IRQ Signal
 set_io bReset_n				117		# Reset VIA Active Low
-
-set_io bPhase2Clock			1		# Vic20 1,108,404 Hz clock
-set_io bRead				3		# Read = 1 / Write = 0
-set_io bCS_n				7		# Chip Select Active Low
-
-set_io bFPGACoreClock		93		# 25Mhz FPGA Clock
-
-set_io nRS[0]				73		# 4 Bit Register Address
-set_io nRS[1]				75
-set_io nRS[2]				78
-set_io nRS[3]				80
-# set_io bCS				82		# nRS[4]  Chip Select Active Hi
-set_io bCS					83		# nRS[5]  Chip Select Active Hi
-set_io bCA1					81
-set_io bCB1					79
 
 set_io nPortA[0]			120		# 8 Bit IO Data Port A
 set_io nPortA[1]			122

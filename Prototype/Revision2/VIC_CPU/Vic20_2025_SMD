@@ -1,0 +1,50 @@
+11909291542747
+Dave Footprints
+DIP-24_W15.24mm_Socket_LongPads
+24-lead though-hole mounted DIP package, row spacing 15.24 mm (600 mils), Socket, LongPads
+THT DIP DIL PDIP 2.54mm 15.24mm 600mil Socket LongPads
+0
+24
+24
+Dave Footprints
+DIP-40_6502
+
+
+0
+40
+40
+Dave Footprints
+DIP-40_6561
+
+
+0
+40
+40
+Dave Footprints
+PinHeader_1x20_P2.54mm_NoPin1Marker
+
+
+0
+20
+20
+Dave Footprints
+PinSocket_2x08_P2.54mm_XFlip
+Through hole straight socket strip, 2x08, 2.54mm pitch, double cols (from Kicad 4.0.7), script generated
+Through hole socket strip THT 2x08 2.54mm double row
+0
+16
+16
+Dave Footprints
+SOIC-28Wider_7.5x17.9mm_P1.27mm
+SOIC, 28 Pin (JEDEC MS-013AE, https://www.analog.com/media/en/package-pcb-resources/package/35833120341221rw_28.pdf), generated with kicad-footprint-generator ipc_gullwing_generator.py
+SOIC SO
+0
+28
+28
+Dave Footprints
+TSOP-I-28_11.8x8mm_P0.55mm
+TSOP I, 28 pins, 18.8x8mm body, 0.55mm pitch, IPC-calculated pads (http://ww1.microchip.com/downloads/en/devicedoc/doc0807.pdf)
+TSOP I 28 pins
+0
+28
+28

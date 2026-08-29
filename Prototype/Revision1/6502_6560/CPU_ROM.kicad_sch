@@ -10225,7 +10225,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "SamacSys_Parts:307-044-558-201"
+		(symbol "_Custom:Vic20_Cartridge_Connector"
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
@@ -10242,7 +10242,7 @@
 					(justify left top)
 				)
 			)
-			(property "Value" "307-044-558-201"
+			(property "Value" "Vic20_Cartridge_Connector"
 				(at -8.382 35.052 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -10253,7 +10253,7 @@
 					(justify left top)
 				)
 			)
-			(property "Footprint" "307044558201"
+			(property "Footprint" "_Custom:Vic20-Cartridge-Connector"
 				(at -7.874 -36.322 0)
 				(show_name no)
 				(do_not_autoplace no)
@@ -10348,7 +10348,7 @@
 					(justify left top)
 				)
 			)
-			(symbol "307-044-558-201_1_1"
+			(symbol "Vic20_Cartridge_Connector_1_1"
 				(rectangle
 					(start -10.16 30.48)
 					(end 10.16 -27.94)
@@ -27067,7 +27067,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Dave Footprints:DIP-40_6502"
+		(property "Footprint" "_Custom:DIP-40_6502"
 			(at 567.69 379.984 0)
 			(hide yes)
 			(show_name no)
@@ -27388,7 +27388,7 @@
 		)
 	)
 	(symbol
-		(lib_id "SamacSys_Parts:307-044-558-201")
+		(lib_id "_Custom:Vic20_Cartridge_Connector")
 		(at 589.28 398.78 0)
 		(mirror y)
 		(unit 1)
@@ -27420,8 +27420,8 @@
 				)
 			)
 		)
-		(property "Footprint" "SamacSys_Parts:307044558201"
-			(at 567.69 493.7 0)
+		(property "Footprint" "_Custom:Vic20-Cartridge-Connector"
+			(at 597.154 435.102 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -27445,7 +27445,7 @@
 			)
 		)
 		(property "Description" "Vic20 Cartridge Connector"
-			(at 589.28 398.78 0)
+			(at 589.026 398.526 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32882,7 +32882,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "Dave Footprints:SOIC-8_5.23x5.23mm_P1.27mm"
+		(property "Footprint" "Package_SO:SOIC-8_5.3x5.3mm_P1.27mm"
 			(at 110.998 207.01 0)
 			(hide yes)
 			(show_name no)
@@ -33013,7 +33013,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SamacSys_Parts:117345301"
+		(property "Footprint" "_Custom:DSUB-15"
 			(at 394.97 162.56 0)
 			(hide yes)
 			(show_name no)
@@ -35594,7 +35594,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "SamacSys_Parts:LEDC2012X90N"
+		(property "Footprint" "LED_SMD:LED_0805_2012Metric"
 			(at 114.3 345.44 0)
 			(hide yes)
 			(show_name no)
@@ -36293,7 +36293,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Dave Footprints:USB_Micro-B_Amphenol_10103594-0001LF_Horizontal"
+		(property "Footprint" "_Custom:USB_Micro-B_Amphenol_10103594-0001LF_Horizontal"
 			(at 339.09 143.51 0)
 			(hide yes)
 			(show_name no)

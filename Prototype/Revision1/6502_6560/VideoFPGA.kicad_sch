@@ -37037,7 +37037,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "Dave Footprints:SOIC-8_5.23x5.23mm_P1.27mm"
+		(property "Footprint" "Package_SO:SOIC-8_5.3x5.3mm_P1.27mm"
 			(at 80.518 191.77 0)
 			(hide yes)
 			(show_name no)
@@ -44807,7 +44807,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "SamacSys_Parts:LEDC2012X90N"
+		(property "Footprint" "LED_SMD:LED_0805_2012Metric"
 			(at 154.94 194.31 0)
 			(hide yes)
 			(show_name no)
@@ -50156,7 +50156,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "Dave Footprints:SOIC-8_5.23x5.23mm_P1.27mm"
+		(property "Footprint" "Package_SO:SOIC-8_5.3x5.3mm_P1.27mm"
 			(at 326.898 143.51 0)
 			(hide yes)
 			(show_name no)
@@ -59316,7 +59316,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "SamacSys_Parts:LEDC2012X90N"
+		(property "Footprint" "LED_SMD:LED_0805_2012Metric"
 			(at 43.18 58.42 0)
 			(hide yes)
 			(show_name no)
@@ -59835,7 +59835,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Dave Footprints:USB_Micro-B_Amphenol_10103594-0001LF_Horizontal"
+		(property "Footprint" "_Custom:USB_Micro-B_Amphenol_10103594-0001LF_Horizontal"
 			(at 547.37 82.55 0)
 			(hide yes)
 			(show_name no)
