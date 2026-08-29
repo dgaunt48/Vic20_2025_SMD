@@ -31790,6 +31790,30 @@
 			)
 		)
 	)
+	(global_label "iCE40-SDO"
+		(shape input)
+		(at 276.86 187.96 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "3c0f27d1-c116-48e4-bb63-97e692390856")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 290.6704 187.96 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
 	(global_label "iCE40-CRESET"
 		(shape output)
 		(at 261.62 254 0)
@@ -31958,30 +31982,6 @@
 			)
 		)
 	)
-	(global_label "iCE40-SDO"
-		(shape input)
-		(at 276.86 182.88 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "61110d95-122f-49e8-b493-84029d6c01ac")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 290.6704 182.88 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-	)
 	(global_label "~{RESET}"
 		(shape input)
 		(at 718.82 114.3 0)
@@ -32115,30 +32115,6 @@
 		(uuid "82f2fb77-5aea-4683-8849-c33b467a5820")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 260.1904 203.2 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-	)
-	(global_label "iCE40-SDI"
-		(shape output)
-		(at 276.86 187.96 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "86bd45e5-dd1d-4b14-bff1-8df3d15b6a1c")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 289.9447 187.96 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -32294,6 +32270,30 @@
 			)
 		)
 	)
+	(global_label "iCE40-SDI"
+		(shape output)
+		(at 276.86 182.88 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "b22b1c98-e48c-4083-a616-78677d2db46e")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 289.9447 182.88 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+	)
 	(global_label "CPU_PHI2"
 		(shape output)
 		(at 563.88 177.8 180)
@@ -32343,7 +32343,7 @@
 		)
 	)
 	(global_label "iCE40-SCK"
-		(shape bidirectional)
+		(shape output)
 		(at 276.86 177.8 0)
 		(fields_autoplaced yes)
 		(effects
@@ -32354,7 +32354,7 @@
 		)
 		(uuid "e7a0f6ae-b721-456a-ae9e-7725b90e8c6f")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 291.7212 177.8 0)
+			(at 290.6099 177.8 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -35767,7 +35767,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SamacSys_Parts:QFP50P2200X2200X160-144N"
+		(property "Footprint" "Package_QFP:LQFP-144_20x20mm_P0.5mm"
 			(at 536.448 330.454 0)
 			(hide yes)
 			(show_name no)
@@ -41605,7 +41605,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Connector_PinSocket_2.54mm:PinSocket_2x10_P2.54mm_Vertical"
+		(property "Footprint" "Connector_PinHeader_2.54mm:PinHeader_2x10_P2.54mm_Vertical"
 			(at 269.24 452.12 0)
 			(hide yes)
 			(show_name no)
@@ -41884,7 +41884,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SamacSys_Parts:QFP50P2200X2200X160-144N"
+		(property "Footprint" "Package_QFP:LQFP-144_20x20mm_P0.5mm"
 			(at 156.972 226.314 0)
 			(hide yes)
 			(show_name no)
@@ -42799,7 +42799,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SamacSys_Parts:QFP50P2200X2200X160-144N"
+		(property "Footprint" "Package_QFP:LQFP-144_20x20mm_P0.5mm"
 			(at 604.012 259.334 0)
 			(hide yes)
 			(show_name no)
@@ -50458,7 +50458,7 @@
 				)
 			)
 		)
-		(property "Footprint" "SamacSys_Parts:QFP50P2200X2200X160-144N"
+		(property "Footprint" "Package_QFP:LQFP-144_20x20mm_P0.5mm"
 			(at 156.972 335.534 0)
 			(hide yes)
 			(show_name no)

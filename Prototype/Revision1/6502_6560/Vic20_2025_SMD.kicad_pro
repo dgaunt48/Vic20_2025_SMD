@@ -626,14 +626,7 @@
       "version": 5
     },
     "net_colors": null,
-    "netclass_assignments": {
-      "/VIA/+3V3_RAIL_VIA": [
-        "Power 3v3"
-      ],
-      "/VIA/+5V0_RAIL_VIA": [
-        "Power 5v0"
-      ]
-    },
+    "netclass_assignments": null,
     "netclass_patterns": [
       {
         "netclass": "Power 5v0",
@@ -910,10 +903,6 @@
     [
       "cc4365b9-ec39-422e-adef-83e21e8c38ff",
       "Video FPGA"
-    ],
-    [
-      "da40289c-b9fb-4b72-91f8-556f080bc2fa",
-      "VIA"
     ]
   ],
   "text_variables": {},
