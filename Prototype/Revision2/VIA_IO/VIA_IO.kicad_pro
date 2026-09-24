@@ -74,6 +74,11 @@
           "gap": 0.0,
           "via_gap": 0.0,
           "width": 0.0
+        },
+        {
+          "gap": 0.2,
+          "via_gap": 0.25,
+          "width": 0.5
         }
       ],
       "drc_exclusions": [],
@@ -542,89 +547,17 @@
         "wire_width": 10
       },
       {
-        "bus_width": 10,
-        "clearance": 0.2,
-        "diff_pair_gap": 0.25,
-        "diff_pair_width": 0.2,
-        "line_style": 0,
-        "microvia_diameter": 0.3,
-        "microvia_drill": 0.1,
-        "name": "Address Bus 3V3",
-        "pcb_color": "rgba(0, 0, 0, 0.000)",
-        "priority": 2,
-        "schematic_color": "rgb(194, 0, 0)",
-        "track_width": 0.2,
-        "tuning_profile": "",
-        "via_diameter": 0.6,
-        "via_drill": 0.3,
-        "wire_width": 10
-      },
-      {
-        "bus_width": 10,
-        "clearance": 0.2,
-        "diff_pair_gap": 0.25,
-        "diff_pair_width": 0.2,
-        "line_style": 0,
-        "microvia_diameter": 0.3,
-        "microvia_drill": 0.1,
-        "name": "Address Bus 5V",
-        "pcb_color": "rgba(0, 0, 0, 0.000)",
-        "priority": 3,
-        "schematic_color": "rgb(72, 0, 0)",
-        "track_width": 0.2,
-        "tuning_profile": "",
-        "via_diameter": 0.6,
-        "via_drill": 0.3,
-        "wire_width": 10
-      },
-      {
-        "bus_width": 10,
-        "clearance": 0.2,
-        "diff_pair_gap": 0.25,
-        "diff_pair_width": 0.2,
-        "line_style": 0,
-        "microvia_diameter": 0.3,
-        "microvia_drill": 0.1,
-        "name": "Data Bus 3V3",
-        "pcb_color": "rgba(0, 0, 0, 0.000)",
-        "priority": 4,
-        "schematic_color": "rgb(0, 0, 255)",
-        "track_width": 0.2,
-        "tuning_profile": "",
-        "via_diameter": 0.6,
-        "via_drill": 0.3,
-        "wire_width": 10
-      },
-      {
-        "bus_width": 10,
-        "clearance": 0.2,
-        "diff_pair_gap": 0.25,
-        "diff_pair_width": 0.2,
-        "line_style": 0,
-        "microvia_diameter": 0.3,
-        "microvia_drill": 0.1,
-        "name": "Data Bus 5V",
-        "pcb_color": "rgba(0, 0, 0, 0.000)",
-        "priority": 5,
-        "schematic_color": "rgb(0, 0, 132)",
-        "track_width": 0.2,
-        "tuning_profile": "",
-        "via_diameter": 0.6,
-        "via_drill": 0.3,
-        "wire_width": 10
-      },
-      {
         "bus_width": 20,
         "clearance": 0.2,
-        "diff_pair_gap": 0.2,
-        "diff_pair_width": 0.5,
+        "diff_pair_gap": 0.25,
+        "diff_pair_width": 0.2,
         "line_style": 0,
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
-        "name": "DifferentialPair",
+        "name": "9VAC",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
-        "priority": 0,
-        "schematic_color": "rgb(194, 0, 194)",
+        "priority": 5,
+        "schematic_color": "rgb(96, 0, 0)",
         "track_width": 0.2,
         "tuning_profile": "",
         "via_diameter": 0.6,
@@ -639,9 +572,73 @@
         "line_style": 0,
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
+        "name": "Address Bus 3V3",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 4,
+        "schematic_color": "rgb(194, 0, 0)",
+        "track_width": 0.2,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 10
+      },
+      {
+        "bus_width": 20,
+        "clearance": 0.2,
+        "diff_pair_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "Data Bus 3V3",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 6,
+        "schematic_color": "rgb(0, 0, 194)",
+        "track_width": 0.2,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 10
+      },
+      {
+        "bus_width": 20,
+        "line_style": 0,
+        "name": "Data Bus 5V",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 0,
+        "schematic_color": "rgb(0, 0, 132)",
+        "tuning_profile": "",
+        "wire_width": 10
+      },
+      {
+        "bus_width": 20,
+        "clearance": 0.2,
+        "diff_pair_gap": 0.2,
+        "diff_pair_width": 0.5,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "DifferentialPair",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 2,
+        "schematic_color": "rgb(72, 0, 72)",
+        "track_width": 0.2,
+        "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 10
+      },
+      {
+        "bus_width": 20,
+        "clearance": 0.2,
+        "diff_pair_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
         "name": "GND",
         "pcb_color": "rgb(0, 255, 0)",
-        "priority": 6,
+        "priority": 7,
         "schematic_color": "rgb(0, 255, 0)",
         "track_width": 0.5,
         "tuning_profile": "",
@@ -659,7 +656,7 @@
         "microvia_drill": 0.1,
         "name": "GPIO",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
-        "priority": 7,
+        "priority": 8,
         "schematic_color": "rgb(243, 41, 255)",
         "track_width": 0.2,
         "tuning_profile": "",
@@ -677,7 +674,7 @@
         "microvia_drill": 0.1,
         "name": "Power 1v1",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
-        "priority": 8,
+        "priority": 9,
         "schematic_color": "rgb(255, 255, 0)",
         "track_width": 0.5,
         "tuning_profile": "",
@@ -695,7 +692,7 @@
         "microvia_drill": 0.1,
         "name": "Power 1v2",
         "pcb_color": "rgb(230, 230, 105)",
-        "priority": 9,
+        "priority": 10,
         "schematic_color": "rgb(194, 194, 0)",
         "track_width": 0.5,
         "tuning_profile": "",
@@ -713,7 +710,7 @@
         "microvia_drill": 0.1,
         "name": "Power 3v3",
         "pcb_color": "rgb(255, 165, 0)",
-        "priority": 10,
+        "priority": 11,
         "schematic_color": "rgb(255, 165, 0)",
         "track_width": 0.5,
         "tuning_profile": "",
@@ -731,12 +728,22 @@
         "microvia_drill": 0.1,
         "name": "Power 5v0",
         "pcb_color": "rgb(255, 0, 0)",
-        "priority": 11,
+        "priority": 12,
         "schematic_color": "rgb(255, 0, 0)",
         "track_width": 0.5,
         "tuning_profile": "",
         "via_diameter": 0.6,
         "via_drill": 0.3,
+        "wire_width": 20
+      },
+      {
+        "bus_width": 20,
+        "line_style": 0,
+        "name": "Power Hi",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "priority": 1,
+        "schematic_color": "rgb(187, 31, 255)",
+        "tuning_profile": "",
         "wire_width": 20
       },
       {
@@ -749,7 +756,7 @@
         "microvia_drill": 0.1,
         "name": "SPI",
         "pcb_color": "rgb(255, 160, 188)",
-        "priority": 12,
+        "priority": 13,
         "schematic_color": "rgb(255, 160, 188)",
         "track_width": 0.2,
         "tuning_profile": "",
@@ -767,7 +774,7 @@
         "microvia_drill": 0.1,
         "name": "Signal 3v3",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
-        "priority": 1,
+        "priority": 3,
         "schematic_color": "rgb(204, 102, 0)",
         "track_width": 0.2,
         "tuning_profile": "",
@@ -816,27 +823,19 @@
       },
       {
         "netclass": "Data Bus 3V3",
-        "pattern": "*/3v3_CD*"
+        "pattern": "*/3V3_*"
       },
       {
-        "netclass": "Address Bus 5V",
+        "netclass": "9VAC",
         "pattern": "*/VA*"
       },
       {
-        "netclass": "Data Bus 3V3",
-        "pattern": "*/3v3_BD*"
-      },
-      {
-        "netclass": "Data Bus 5V",
+        "netclass": "Default",
         "pattern": "*/BD*"
       },
       {
-        "netclass": "Data Bus 5V",
+        "netclass": "Default",
         "pattern": "*/CD*"
-      },
-      {
-        "netclass": "Address Bus 5V",
-        "pattern": "*/CA*"
       },
       {
         "netclass": "Address Bus 3V3",
@@ -844,7 +843,7 @@
       },
       {
         "netclass": "SPI",
-        "pattern": "iCE40-*"
+        "pattern": "*iCE40-*"
       },
       {
         "netclass": "Signal 3v3",
@@ -859,12 +858,36 @@
         "pattern": "*/3v3_IO*"
       },
       {
-        "netclass": "Data Bus 5V",
+        "netclass": "Default",
         "pattern": "*/VD*"
       },
       {
         "netclass": "DifferentialPair",
         "pattern": "*D-"
+      },
+      {
+        "netclass": "Power Hi",
+        "pattern": "+11.3V"
+      },
+      {
+        "netclass": "9VAC",
+        "pattern": "*VAC*"
+      },
+      {
+        "netclass": "Power Hi",
+        "pattern": "*6VDC"
+      },
+      {
+        "netclass": "Data Bus 5V",
+        "pattern": "*/5V_*"
+      },
+      {
+        "netclass": "DifferentialPair",
+        "pattern": "*LANE.*"
+      },
+      {
+        "netclass": "DifferentialPair",
+        "pattern": "*DVI_*"
       }
     ]
   },
@@ -910,24 +933,6 @@
           "show": true
         },
         {
-          "group_by": true,
-          "label": "Value",
-          "name": "Value",
-          "show": true
-        },
-        {
-          "group_by": false,
-          "label": "Datasheet",
-          "name": "Datasheet",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "Footprint",
-          "name": "Footprint",
-          "show": true
-        },
-        {
           "group_by": false,
           "label": "Qty",
           "name": "${QUANTITY}",
@@ -935,32 +940,50 @@
         },
         {
           "group_by": true,
+          "label": "Value",
+          "name": "Value",
+          "show": true
+        },
+        {
+          "group_by": true,
           "label": "DNP",
           "name": "${DNP}",
+          "show": false
+        },
+        {
+          "group_by": true,
+          "label": "Exclude from BOM",
+          "name": "${EXCLUDE_FROM_BOM}",
+          "show": false
+        },
+        {
+          "group_by": true,
+          "label": "Exclude from Board",
+          "name": "${EXCLUDE_FROM_BOARD}",
+          "show": false
+        },
+        {
+          "group_by": true,
+          "label": "Exclude from Simulation",
+          "name": "${EXCLUDE_FROM_SIM}",
+          "show": false
+        },
+        {
+          "group_by": true,
+          "label": "Exclude from Position Files",
+          "name": "${EXCLUDE_FROM_POS_FILES}",
+          "show": false
+        },
+        {
+          "group_by": true,
+          "label": "Footprint",
+          "name": "Footprint",
           "show": true
         },
         {
           "group_by": false,
-          "label": "#",
-          "name": "${ITEM_NUMBER}",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "Description",
-          "name": "Description",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "Voltage",
-          "name": "Voltage",
-          "show": false
-        },
-        {
-          "group_by": false,
-          "label": "class",
-          "name": "class",
+          "label": "Datasheet",
+          "name": "Datasheet",
           "show": false
         },
         {
@@ -1016,14 +1039,50 @@
           "label": "Sim.Type",
           "name": "Sim.Type",
           "show": false
+        },
+        {
+          "group_by": false,
+          "label": "class",
+          "name": "class",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "#",
+          "name": "${ITEM_NUMBER}",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Description",
+          "name": "Description",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Voltage",
+          "name": "Voltage",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Arrow Price/Stock",
+          "name": "Arrow Price/Stock",
+          "show": false
+        },
+        {
+          "group_by": false,
+          "label": "Arrow Part Number",
+          "name": "Arrow Part Number",
+          "show": false
         }
       ],
       "filter_string": "",
       "group_symbols": true,
-      "include_excluded_from_bom": false,
+      "include_excluded_from_bom": true,
       "name": "",
       "sort_asc": true,
-      "sort_field": "Reference"
+      "sort_field": "${EXCLUDE_FROM_POS_FILES}"
     },
     "bus_aliases": {},
     "connection_grid_size": 50.0,
@@ -1082,7 +1141,7 @@
         "uuid": "16bb0c36-3875-4576-b955-c7c78a69631c"
       }
     ],
-    "used_designators": "J1-25,J201-205,#FLG1-10,#FLG201,R1-130,R201-210,R212-217,R219-220,D1-3,#PWR1-132,#PWR134-155,#PWR157,#PWR202,#PWR204,#PWR206,#PWR208-209,#PWR212-214,#PWR218-222,#PWR224-229,#PWR232,#PWR236-237,#PWR243-244,#PWR247-248,#PWR251,#PWR253-254,#PWR257,#PWR262,#PWR264,C1-90,C201-218,C220-223,C227,Power1-2,U1-30,U32,U201-203,U205-208,U211,S1-2,TP1-26,TP201-205,CDone1,JP1-5,Q1,Q3,Y1-2,Y201,H1-4,FB1-3,X1-2,BR1,CN1,CN8,RV1-2,F1,FL1,L1,SW1,CHROMA1,LUMA1,DIN1",
+    "used_designators": "J1-25,J201-205,#FLG1-15,#FLG201,R1-148,R201-210,R212-217,R219-220,D1-11,#PWR1-155,#PWR157,#PWR202,#PWR204,#PWR206,#PWR208-209,#PWR212-214,#PWR218-222,#PWR224-229,#PWR232,#PWR236-237,#PWR243-244,#PWR247-248,#PWR251,#PWR253-254,#PWR257,#PWR262,#PWR264,C1-90,C201-218,C220-223,C227,Power1-2,U1-30,U32,U201-203,U205-208,U211,S1-2,TP1-26,TP201-205,CDone1,JP1-7,Q1-3,Y1-2,Y201,H1-4,FB1-3,X1-2,BR1,CN1,CN8,RV1-2,F1,FL1,L1,SW1,CHROMA1,EDGE1-3,LUMA1,DIN1-3,NT1-31,Je1",
     "variants": []
   },
   "sheets": [
