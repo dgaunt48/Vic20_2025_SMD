@@ -39,9 +39,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 1.6,
-          "height": 3.0,
-          "width": 3.0
+          "drill": 0.0,
+          "height": 0.4,
+          "width": 1.475
         },
         "silk_line_width": 0.15,
         "silk_text_italic": false,
@@ -221,6 +221,7 @@
         0.0,
         0.2,
         0.25,
+        0.3,
         0.5
       ],
       "tuning_pattern_settings": {
@@ -257,10 +258,6 @@
         {
           "diameter": 0.7,
           "drill": 0.3
-        },
-        {
-          "diameter": 1.6,
-          "drill": 0.6
         }
       ],
       "zones_allow_external_fillets": false
@@ -548,7 +545,7 @@
       },
       {
         "bus_width": 20,
-        "clearance": 0.2,
+        "clearance": 0.4,
         "diff_pair_gap": 0.25,
         "diff_pair_width": 0.2,
         "line_style": 0,
@@ -558,7 +555,7 @@
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": 5,
         "schematic_color": "rgb(96, 0, 0)",
-        "track_width": 0.2,
+        "track_width": 0.5,
         "tuning_profile": "",
         "via_diameter": 0.6,
         "via_drill": 0.3,
@@ -738,12 +735,20 @@
       },
       {
         "bus_width": 20,
+        "clearance": 0.4,
+        "diff_pair_gap": 0.25,
+        "diff_pair_width": 0.2,
         "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
         "name": "Power Hi",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "priority": 1,
         "schematic_color": "rgb(187, 31, 255)",
+        "track_width": 0.5,
         "tuning_profile": "",
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
         "wire_width": 20
       },
       {
@@ -1082,7 +1087,7 @@
       "include_excluded_from_bom": true,
       "name": "",
       "sort_asc": true,
-      "sort_field": "${EXCLUDE_FROM_POS_FILES}"
+      "sort_field": "Reference"
     },
     "bus_aliases": {},
     "connection_grid_size": 50.0,
@@ -1141,7 +1146,7 @@
         "uuid": "16bb0c36-3875-4576-b955-c7c78a69631c"
       }
     ],
-    "used_designators": "J1-25,J201-205,#FLG1-15,#FLG201,R1-148,R201-210,R212-217,R219-220,D1-11,#PWR1-155,#PWR157,#PWR202,#PWR204,#PWR206,#PWR208-209,#PWR212-214,#PWR218-222,#PWR224-229,#PWR232,#PWR236-237,#PWR243-244,#PWR247-248,#PWR251,#PWR253-254,#PWR257,#PWR262,#PWR264,C1-90,C201-218,C220-223,C227,Power1-2,U1-30,U32,U201-203,U205-208,U211,S1-2,TP1-26,TP201-205,CDone1,JP1-7,Q1-3,Y1-2,Y201,H1-4,FB1-3,X1-2,BR1,CN1,CN8,RV1-2,F1,FL1,L1,SW1,CHROMA1,EDGE1-3,LUMA1,DIN1-3,NT1-31,Je1",
+    "used_designators": "AC1-2,J1-25,J201-205,#FLG1-15,#FLG201,R1-149,R201-210,R212-217,R219-220,D1-13,#PWR1-157,#PWR160,#PWR202,#PWR204,#PWR206,#PWR208-209,#PWR212-214,#PWR218-222,#PWR224-229,#PWR232,#PWR236-237,#PWR243-244,#PWR247-248,#PWR251,#PWR253-254,#PWR257,#PWR262,#PWR264,C1-90,C201-218,C220-223,C227,Power1-2,U1-30,U32,U201-203,U205-208,U211,S1-2,TP1-26,TP201-205,CDone1,JP1-7,Q1-3,Y1-2,Y201,H1-4,RN1,FB1-3,X1-2,BR1,CN1,CN8,RV1-2,F1,FL1,L1,SW1,CHROMA1,EDGE1-3,LUMA1,DIN1-3,NT1-31,Je1-2",
     "variants": []
   },
   "sheets": [
